@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="id" data-root=".">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jadwal Studio · Studio Ampenan</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="jadwal.html">
+<main>
+  <div class="page-head">
+    <h1>Jadwal & Milestone</h1>
+    <p class="muted">12 sesi Tuweb, 6 September – 22 November 2026. Sesi yang sedang berjalan disorot.</p>
+  </div>
+  <div class="card"><ul class="timeline" id="timeline"></ul></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+(async function () {
+  const { bacaTab, esc, tanggal, formatTanggal, sesiSekarang } = Studio;
+  const jadwal = await bacaTab("jadwal");
+  const kini = sesiSekarang(jadwal);
+  const hariIni = new Date();
+  document.getElementById("timeline").innerHTML = jadwal.map((s) => {
+    const d = tanggal(s.tanggal);
+    const status = s.status
+      ? `<span class="pill ${/tercapai|selesai/i.test(s.status) ? "ok" : "warn"}">${esc(s.status)}</span>`
+      : (kini && s.sesi === kini.sesi) ? `<span class="pill info">Berjalan</span>`
+      : (d && d < hariIni) ? `<span class="pill neutral">Lewat</span>` : `<span class="pill neutral">Akan datang</span>`;
+    const notulen = s.tautan_notulensi ? ` · <a href="${esc(s.tautan_notulensi)}" target="_blank" rel="noopener">notulensi</a>` : "";
+    return `<li class="${kini && s.sesi === kini.sesi ? "kini" : ""}">
+      <span class="sesi">Sesi ${esc(s.sesi)}</span>
+      <span class="muted">${formatTanggal(d)}</span>
+      <span>${esc(s.kegiatan)}<br><span class="small muted">${esc(s.tahap_ut)} · Target: ${esc(s.target_luaran)}${notulen}</span></span>
+      <span>${status}</span></li>`;
+  }).join("");
+})();
+</script>
+</body>
+</html>

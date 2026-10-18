@@ -1,0 +1,22 @@
+{
+  "judul": "Studio Proses Perencanaan Kecamatan Ampenan",
+  "_petunjuk_google_sheets": "Isi URL CSV hasil 'File > Bagikan > Publikasikan ke web' (pilih tab, format CSV) untuk tiap tab. Bila dikosongkan, dashboard memakai salinan lokal di data/sheets/<nama>.csv.",
+  "google_sheets": {
+    "jadwal": "",
+    "tugas": "",
+    "kebutuhan_data": "",
+    "survei_foto": ""
+  },
+  "tanggal_presentasi_akhir": "2026-11-22",
+  "kategori_survei": [
+    {"nama": "Cagar Budaya", "warna": "#8e44ad"},
+    {"nama": "Sempadan Alam", "warna": "#1f78b4"},
+    {"nama": "Rawan Bencana", "warna": "#d7301f"},
+    {"nama": "Permukiman Kumuh & KDB", "warna": "#e6850e"},
+    {"nama": "Alih Fungsi KP2B", "warna": "#33a02c"},
+    {"nama": "Sarana", "warna": "#0b8a8a"},
+    {"nama": "Prasarana", "warna": "#6a5acd"},
+    {"nama": "Ekonomi & UMKM", "warna": "#b8860b"},
+    {"nama": "Lainnya", "warna": "#7f8c8d"}
+  ]
+}

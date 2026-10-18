@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analisis · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <h1>Kalkulator Analisis</h1>
+    <p class="muted">Tim mengisi angka di tab input Google Sheets, hasil dihitung otomatis di halaman ini. Rumus diambil dari template dosen (kesalahan rumusnya sudah diperbaiki) dan dari metode di proposal.</p>
+  </div>
+  <div class="filters">
+    <select id="f-aspek"></select>
+    <span class="muted small" id="jumlah"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>No</th><th>Kalkulator</th><th>Aspek / tahap</th><th>Dasar rumus</th><th>Status</th></tr></thead>
+      <tbody id="tabel"></tbody>
+    </table>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="../assets/js/common.js"></script>
+<script>
+(function () {
+  const { esc, opsi } = Studio;
+  // [no, nama, aspek, dasar, halaman (kosong = belum dibuat)]
+  const DAFTAR = [
+    [1, "Proyeksi penduduk (aritmatik, geometrik, eksponensial)", "Demografi", "Template 1 + proposal", ""],
+    [2, "Kepadatan penduduk", "Demografi", "Template 1 + SNI 03-1733-2004", ""],
+    [3, "Struktur penduduk (rasio jenis kelamin, ketergantungan, piramida)", "Demografi", "Proposal", ""],
+    [4, "Kebutuhan rumah & lahan permukiman", "Demografi", "Template 1 (diperbaiki)", ""],
+    [5, "Proyeksi kebutuhan sarana (6 kelompok)", "Sarana & Prasarana", "Template 2 + SNI 03-1733-2004", ""],
+    [6, "Proyeksi prasarana (listrik, air bersih, air limbah, sampah, telekomunikasi)", "Sarana & Prasarana", "Template 7 (diperbaiki)", ""],
+    [7, "Indeks sentralitas antar-kelurahan", "Sarana & Prasarana", "Template sentralitas", ""],
+    [8, "Kecukupan RTH 20%", "Sarana & Prasarana", "UU 26/2007, Permen ATR 14/2022", ""],
+    [9, "Location Quotient", "Ekonomi", "Template 4", ""],
+    [10, "Shift Share", "Ekonomi", "Template 5", ""],
+    [11, "Perubahan / alih fungsi lahan", "Fisik & Ekonomi", "Proposal", ""],
+    [12, "Satuan Kemampuan Lahan (9 SKL)", "Fisik & Lingkungan", "Permen PU 20/PRT/M/2007", ""],
+    [13, "Daya dukung & daya tampung lahan permukiman", "Fisik & Lingkungan", "Proposal", ""],
+    [14, "Keterpaparan bencana per kelurahan", "Fisik & Lingkungan", "Proposal", ""],
+    [15, "Kondisi cagar budaya", "Sosial & Budaya", "Proposal", ""],
+    [16, "Matriks pemangku kepentingan", "Pembiayaan & Kelembagaan", "Proposal", ""],
+    [17, "Efektivitas anggaran", "Pembiayaan & Kelembagaan", "Proposal", ""],
+    [18, "AHP (uji CR, agregasi geometrik)", "Tahap 2 · AHP-WLC", "Proposal", ""],
+    [19, "Generator WLC & rekap Zonasi 5 kelas", "Tahap 2 · AHP-WLC", "Proposal", ""],
+    [20, "Konflik spasial & spatial mismatch", "Tahap 3", "Proposal", ""],
+    [21, "IFAS/EFAS & kuadran SWOT", "Tahap 4", "Proposal", ""],
+  ];
+  const fA = document.getElementById("f-aspek");
+  opsi(fA, DAFTAR.map((d) => d[2]), "Semua aspek");
+  function render() {
+    const rows = DAFTAR.filter((d) => !fA.value || d[2] === fA.value);
+    document.getElementById("jumlah").textContent = `${rows.length} dari ${DAFTAR.length} kalkulator`;
+    document.getElementById("tabel").innerHTML = rows.map(([no, nama, aspek, dasar, hal]) => `<tr>
+      <td class="num">${no}</td><td>${hal ? `<a href="${esc(hal)}">${esc(nama)}</a>` : esc(nama)}</td>
+      <td>${esc(aspek)}</td><td class="small">${esc(dasar)}</td>
+      <td>${hal ? '<span class="pill ok">Siap dipakai</span>' : '<span class="pill neutral">Sedang dibuat</span>'}</td></tr>`).join("");
+  }
+  fA.addEventListener("change", render);
+  render();
+})();
+</script>
+</body>
+</html>

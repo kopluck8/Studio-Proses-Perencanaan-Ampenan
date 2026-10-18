@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="id" data-root=".">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Studio Ampenan</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="index.html">
+<main>
+  <div class="page-head">
+    <h1>Studio Proses Perencanaan · Kecamatan Ampenan</h1>
+    <p class="muted">Isu strategis: ketidaksesuaian pemanfaatan ruang dan konflik spasial akibat tekanan pertumbuhan perkotaan dan bahaya bencana pesisir terhadap Kawasan Cagar Budaya serta sempadan alam.</p>
+  </div>
+
+  <div class="grid grid-4" id="kartu"></div>
+
+  <div class="grid grid-2" style="margin-top:1rem">
+    <div class="card">
+      <h2>Progres per tahap</h2>
+      <div id="per-tahap"></div>
+    </div>
+    <div class="card">
+      <h2>Progres per bidang</h2>
+      <div id="per-bidang"></div>
+    </div>
+    <div class="card">
+      <h2>Tenggat 7 hari ke depan</h2>
+      <div id="tenggat"></div>
+    </div>
+    <div class="card">
+      <h2>Perlu perhatian</h2>
+      <div id="perhatian"></div>
+    </div>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+(async function () {
+  const S = Studio;
+  const [cfg, jadwal, tugas, data, foto, ket] = await Promise.all([
+    S.config(), S.bacaTab("jadwal"), S.bacaTab("tugas"), S.bacaTab("kebutuhan_data"),
+    S.bacaCSV(`${S.ROOT}/data/survei/survei_foto.csv`), S.bacaTab("survei_foto").catch(() => []),
+  ]);
+  const hariIni = new Date();
+  const kini = S.sesiSekarang(jadwal);
+  const akhir = S.tanggal(cfg.tanggal_presentasi_akhir);
+  const sisaHari = akhir ? Math.ceil((akhir - hariIni) / 86400000) : "";
+  const selesai = (t) => /selesai/i.test(t.status);
+  const nSelesai = tugas.filter(selesai).length;
+  const nLengkap = data.filter((d) => /ada lengkap/i.test(d.kondisi)).length;
+  const nCek = data.filter((d) => S.benar(d.ceklis_deo)).length;
+  const nKet = ket.filter((k) => k.kategori).length;
+
+  document.getElementById("kartu").innerHTML = [
+    ["Sesi berjalan", kini ? `${kini.sesi} / ${jadwal.length}` : "-", kini ? S.esc(kini.kegiatan) : ""],
+    ["Menuju presentasi akhir", `${sisaHari} hari`, S.formatTanggal(akhir)],
+    ["Tugas selesai", `${nSelesai} / ${tugas.length}`, `${S.persen(nSelesai, tugas.length)}%`],
+    ["Data ada lengkap", `${nLengkap} / ${data.length}`, `${nCek} sudah diverifikasi Deo`],
+    ["Foto survei", foto.length, `${nKet} sudah berketerangan · <a href="peta-survei.html">lihat peta</a>`],
+  ].map(([l, v, s]) => `<div class="card stat"><div class="label">${l}</div><div class="value">${v}</div><div class="sub">${s}</div></div>`).join("");
+
+  const TAHAP = [["0", "Persiapan & survei"], ["1", "1 · Analisis 6 aspek"], ["2", "2 · AHP-WLC"], ["3", "3 · Konflik & mismatch"], ["4", "4 · SWOT & laporan"]];
+  document.getElementById("per-tahap").innerHTML = TAHAP.map(([k, n]) => {
+    const g = tugas.filter((t) => t.tahap === k);
+    return S.barRow(`${n} (${g.length})`, g.filter(selesai).length, g.length);
+  }).join("");
+
+  const bidang = [...new Set(tugas.map((t) => t.bidang))].sort();
+  document.getElementById("per-bidang").innerHTML = bidang.map((b) => {
+    const g = tugas.filter((t) => t.bidang === b);
+    return S.barRow(`${b} (${g.length})`, g.filter(selesai).length, g.length);
+  }).join("");
+
+  const minggu = new Date(hariIni.getTime() + 7 * 86400000);
+  const dekat = tugas.filter((t) => { const d = S.tanggal(t.tenggat); return d && d >= new Date(hariIni.toDateString()) && d <= minggu && !selesai(t); });
+  document.getElementById("tenggat").innerHTML = dekat.length
+    ? `<ul>${dekat.map((t) => `<li><b>${S.esc(t.judul)}</b> · ${S.esc(t.pj)} · ${S.formatTanggal(S.tanggal(t.tenggat))}</li>`).join("")}</ul>`
+    : `<p class="muted">Tidak ada tenggat dalam 7 hari.</p>`;
+
+  const telat = tugas.filter((t) => { const d = S.tanggal(t.tenggat); return d && d < new Date(hariIni.toDateString()) && !selesai(t); });
+  const hambat = tugas.filter((t) => S.benar(t.terhambat));
+  const antri = data.filter((d) => /ada lengkap/i.test(d.kondisi) && !S.benar(d.ceklis_deo));
+  const isi = [];
+  if (hambat.length) isi.push(`<p><span class="pill bad">Terhambat</span> ${hambat.map((t) => S.esc(t.judul)).join(", ")}</p>`);
+  if (telat.length) isi.push(`<p><span class="pill warn">Lewat tenggat</span> ${telat.map((t) => S.esc(t.judul)).join(", ")}</p>`);
+  if (antri.length) isi.push(`<p><span class="pill info">Menunggu verifikasi Deo</span> ${antri.map((d) => S.esc(d.data)).join(", ")}</p>`);
+  if (foto.length - nKet) isi.push(`<p><span class="pill neutral">Foto survei</span> ${foto.length - nKet} foto belum diberi kategori/keterangan.</p>`);
+  document.getElementById("perhatian").innerHTML = isi.join("") || `<p class="muted">Tidak ada.</p>`;
+})();
+</script>
+</body>
+</html>

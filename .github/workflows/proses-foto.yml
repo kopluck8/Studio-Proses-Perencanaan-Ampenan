@@ -1,0 +1,31 @@
+name: Proses foto survei
+
+# Foto asli yang diunggah ke survei/unggah/ diperkecil, koordinatnya dibaca,
+# lalu data/survei/survei_foto.csv diperbarui dan foto asli dihapus dari folder unggah.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "survei/unggah/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  proses:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pillow
+      - run: python scripts/proses_foto.py survei/unggah --hapus-asli
+      - name: Simpan hasil
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A survei data/survei
+          git diff --cached --quiet || git commit -m "Proses foto survei baru"
+          git push

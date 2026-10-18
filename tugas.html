@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="id" data-root=".">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tugas per Bidang · Studio Ampenan</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="tugas.html">
+<main>
+  <div class="page-head">
+    <h1>Tugas per Bidang</h1>
+    <p class="muted">Diperbarui anggota tim di tab <b>tugas</b> Google Sheets. Status: Belum mulai · Dikerjakan · Review pembimbing · Selesai.</p>
+  </div>
+  <div class="filters">
+    <select id="f-bidang"></select>
+    <select id="f-tahap"></select>
+    <select id="f-status"></select>
+    <input type="search" id="f-cari" placeholder="Cari tugas / nama">
+    <span class="muted small" id="jumlah"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>Tahap</th><th>Tugas</th><th>Bidang</th><th>PJ</th><th>Sesi</th><th>Tenggat</th><th>Status</th><th>Catatan</th></tr></thead>
+      <tbody id="tabel"></tbody>
+    </table>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+(async function () {
+  const { bacaTab, esc, opsi, benar, tanggal, formatTanggal } = Studio;
+  const NAMA_TAHAP = { "0": "Persiapan & survei", "1": "1 · Analisis 6 aspek", "2": "2 · AHP-WLC", "3": "3 · Konflik & mismatch", "4": "4 · SWOT & laporan" };
+  const KELAS = { "selesai": "ok", "review pembimbing": "info", "dikerjakan": "warn", "belum mulai": "neutral" };
+  const tugas = (await bacaTab("tugas")).map((t) => ({ ...t, tahapNama: NAMA_TAHAP[t.tahap] || t.tahap }));
+  const fB = document.getElementById("f-bidang"), fT = document.getElementById("f-tahap");
+  const fS = document.getElementById("f-status"), fQ = document.getElementById("f-cari");
+  opsi(fB, tugas.map((t) => t.bidang), "Semua bidang");
+  opsi(fT, tugas.map((t) => t.tahapNama), "Semua tahap");
+  opsi(fS, tugas.map((t) => t.status), "Semua status");
+  const hariIni = new Date();
+  function render() {
+    const q = fQ.value.toLowerCase();
+    const rows = tugas.filter((t) => (!fB.value || t.bidang === fB.value) && (!fT.value || t.tahapNama === fT.value) &&
+      (!fS.value || t.status === fS.value) && (!q || [t.judul, t.pj, t.catatan].join(" ").toLowerCase().includes(q)));
+    document.getElementById("jumlah").textContent = `${rows.length} dari ${tugas.length} tugas`;
+    document.getElementById("tabel").innerHTML = rows.map((t) => {
+      const d = tanggal(t.tenggat);
+      const telat = d && d < hariIni && !/selesai/i.test(t.status);
+      const hambat = benar(t.terhambat) ? ` <span class="pill bad">Terhambat</span>` : "";
+      const judul = t.tautan_hasil ? `<a href="${esc(t.tautan_hasil)}">${esc(t.judul)}</a>` : esc(t.judul);
+      return `<tr><td>${esc(t.id)}</td><td class="small">${esc(t.tahapNama)}</td><td>${judul}</td><td>${esc(t.bidang)}</td>
+        <td>${esc(t.pj)}</td><td class="num">${esc(t.sesi_target)}</td>
+        <td${telat ? ' style="color:var(--bad);font-weight:600"' : ""}>${formatTanggal(d)}</td>
+        <td><span class="pill ${KELAS[(t.status || "").toLowerCase()] || "neutral"}">${esc(t.status)}</span>${hambat}</td>
+        <td class="small">${esc(t.catatan)}</td></tr>`;
+    }).join("");
+  }
+  [fB, fT, fS].forEach((el) => el.addEventListener("change", render));
+  fQ.addEventListener("input", render);
+  render();
+})();
+</script>
+</body>
+</html>

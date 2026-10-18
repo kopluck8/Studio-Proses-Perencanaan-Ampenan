@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="id" data-root=".">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peta Survei Lapangan · Studio Ampenan</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="peta-survei.html">
+<main>
+  <div class="page-head">
+    <h1>Peta Survei Lapangan</h1>
+    <p class="muted">Foto bergeotag hasil survei primer. Klik titik untuk melihat foto dan keterangannya.</p>
+  </div>
+  <div class="filters">
+    <select id="f-kategori"></select>
+    <select id="f-kelurahan"></select>
+    <select id="f-tanggal"></select>
+    <select id="f-aplikasi"></select>
+    <input type="search" id="f-cari" placeholder="Cari judul / keterangan / nama file">
+    <span class="muted small" id="jumlah"></span>
+  </div>
+  <div class="map-layout">
+    <div id="peta"></div>
+    <aside class="side">
+      <div class="card">
+        <h3>Kategori</h3>
+        <div id="legenda" class="grid" style="gap:.3rem"></div>
+      </div>
+      <div class="card">
+        <h3>Titik per kelurahan</h3>
+        <div id="rekap"></div>
+      </div>
+      <div class="card">
+        <h3>Galeri</h3>
+        <div class="galeri" id="galeri"></div>
+      </div>
+      <div id="peringatan"></div>
+      <a class="btn ghost" id="unduh" download="survei_foto.geojson">Unduh GeoJSON (untuk QGIS)</a>
+    </aside>
+  </div>
+</main>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true">
+  <button class="tutup" id="lb-tutup">Tutup ✕</button>
+  <button class="nav-l" id="lb-prev" aria-label="Sebelumnya">‹</button>
+  <img id="lb-img" alt="">
+  <div class="cap" id="lb-cap"></div>
+  <button class="nav-r" id="lb-next" aria-label="Berikutnya">›</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/peta-survei.js"></script>
+</body>
+</html>
