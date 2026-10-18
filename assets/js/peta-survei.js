@@ -87,7 +87,8 @@
       <img src="${ROOT}/survei/thumb/${encodeURIComponent(f.nama_file)}" data-file="${esc(f.nama_file)}" alt="${esc(judul)}" loading="lazy">
       <h3>${esc(judul)}</h3>
       ${f.keterangan_temuan ? `<p class="small" style="margin:0 0 .3rem">${esc(f.keterangan_temuan)}</p>` : ""}
-      <dl>${baris.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>${catatan}</div>`;
+      <dl>${baris.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>${catatan}
+      <button class="btn-kecil" data-isi="${esc(f.nama_file)}">${f.kategori && f.kategori !== TANPA_KATEGORI ? "Ubah keterangan" : "Isi keterangan"}</button></div>`;
   }
 
   function terapkan() {
@@ -169,6 +170,56 @@
     document.getElementById("lb-cap").textContent =
       `${f.judul || f.nama_file} · ${f.kelurahan} · ${f.waktu}  (${lbIndex + 1}/${tampil.length})`;
   }
+  // Formulir keterangan foto; tersimpan ke tab survei_foto di spreadsheet.
+  const KOLOM_KET = [
+    ["kategori", "Kategori"], ["judul", "Judul singkat"], ["keterangan_temuan", "Keterangan temuan"], ["kondisi", "Kondisi"],
+    ["surveyor", "Surveyor"], ["bidang", "Bidang"], ["arah_foto", "Arah foto"], ["kaitan_analisis", "Kaitan dengan analisis"],
+  ];
+  function formKeterangan(nama) {
+    const baris = ket[nama];
+    const nilai = baris || {};
+    const dlg = document.createElement("div");
+    dlg.className = "modal-latar";
+    dlg.innerHTML = `<form class="modal" style="width:min(520px,100%);max-height:90vh;overflow:auto">
+      <h2>Keterangan foto</h2><p class="small muted">${esc(nama)}</p>
+      ${KOLOM_KET.map(([k, label]) => k === "kategori"
+        ? `<label>${label}<select name="kategori"><option value="">(pilih)</option>${cfg.kategori_survei.map((c) => `<option${c.nama === nilai.kategori ? " selected" : ""}>${esc(c.nama)}</option>`).join("")}</select></label>`
+        : k === "keterangan_temuan"
+          ? `<label>${label}<textarea name="${k}" rows="3">${esc(nilai[k] || "")}</textarea></label>`
+          : `<label>${label}<input name="${k}" value="${esc(nilai[k] || "")}"></label>`).join("")}
+      <p class="small" data-pesan></p>
+      <div class="modal-aksi"><button type="button" class="btn-kecil" data-batal>Batal</button><button class="btn-utama">Simpan ke spreadsheet</button></div>
+    </form>`;
+    document.body.append(dlg);
+    const form = dlg.querySelector("form"), pesan = dlg.querySelector("[data-pesan]");
+    dlg.querySelector("[data-batal]").onclick = () => dlg.remove();
+    form.onsubmit = async (ev) => {
+      ev.preventDefault();
+      const isian = Object.fromEntries(new FormData(form));
+      pesan.textContent = "Menyimpan…";
+      try {
+        let j;
+        if (baris && baris._asli) {
+          const baru = {};
+          Object.entries(isian).forEach(([k, v]) => { if (String(v).trim() !== String(baris._asli[k] ?? "").trim()) baru[k] = v; });
+          if (!Object.keys(baru).length) { dlg.remove(); return; }
+          j = await Studio.simpan("survei_foto", [{ baris: baris._baris, asli: baris._asli, baru }], []);
+        } else {
+          j = await Studio.simpan("survei_foto", [], [{ nama_file: nama, ...isian }]);
+        }
+        pesan.textContent = Studio.ringkasHasil(j);
+        if (j && j.ok && !j.konflik?.length) setTimeout(() => location.reload(), 1200);
+      } catch (err) {
+        pesan.textContent = `Gagal: ${err.message}`;
+      }
+    };
+  }
+
+  // Delegasi: isi popup dibuat ulang saat popup.update(), jadi tombol tidak diberi listener langsung.
+  document.getElementById("peta").addEventListener("click", (e) => {
+    const t = e.target.closest("[data-isi]");
+    if (t) formKeterangan(t.dataset.isi);
+  });
   peta.on("popupopen", (e) => {
     const img = e.popup.getElement().querySelector("img[data-file]");
     if (!img) return;
@@ -190,7 +241,7 @@
   const perlu = foto.filter((f) => f.catatan_cek || isNaN(f.lat));
   const tanpaKet = foto.filter((f) => f.kategori === TANPA_KATEGORI).length;
   document.getElementById("peringatan").innerHTML =
-    (tanpaKet ? `<div class="notice info">${tanpaKet} foto belum diberi kategori dan keterangan. Isi di tab <b>survei_foto</b> Google Sheets.</div>` : "") +
+    (tanpaKet ? `<div class="notice info">${tanpaKet} foto belum diberi kategori dan keterangan. Klik titiknya lalu tekan <b>Isi keterangan</b>.</div>` : "") +
     (perlu.length ? `<div class="notice"><b>${perlu.length} foto perlu dicek:</b><br>${perlu.map((f) => `${esc(f.nama_file)}: ${esc(f.catatan_cek || "tanpa koordinat")}`).join("<br>")}</div>` : "");
 
   // Unduh GeoJSON

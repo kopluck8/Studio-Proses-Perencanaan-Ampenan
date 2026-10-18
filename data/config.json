@@ -3,6 +3,21 @@
   "_petunjuk_google_sheets": "Isi google_sheets_id dengan ID spreadsheet (menu Dashboard Studio → Tampilkan ID, dari apps-script/Kode.gs). Semua tab dibaca otomatis. google_sheets hanya untuk mengganti sumber satu tab dengan URL CSV lain; biarkan kosong.",
   "google_sheets_id": "1HkCApfdFTBw_9PUXACgAsVMwIrbEA7PgwVVKozuyVIg",
   "google_sheets": {},
+  "apps_script_url": "https://script.google.com/macros/s/AKfycbzk0bqr4OZQq7jP1z6oyA0_HyNB8nwj4yM34WAqw4D-W57wjtzcyYyTBQu5jrSSSL10-w/exec",
+  "anggota_tim": [
+    "Adhe Ario Chandra",
+    "Alifia Aulia Maudina Gazali",
+    "Angga Prastio",
+    "Durrotun Nafisah",
+    "Dwi Romario Pasha",
+    "Faldeo Adrean Falsa",
+    "Fathan Fajrulloh",
+    "I Putu Tristan Sugiartha Putra",
+    "Lalu Dwi Panggih",
+    "Ridwan Malik Hanggono",
+    "Rohid Barekah",
+    "Selvia Karmila"
+  ],
   "tanggal_presentasi_akhir": "2026-11-22",
   "kategori_survei": [
     {

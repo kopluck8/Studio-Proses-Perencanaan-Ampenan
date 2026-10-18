@@ -47,6 +47,9 @@
     return String(s).split(/[;,\s]+/).map(Number).filter((n) => n > 1900);
   }
 
+  // Sel berbeda dari isi spreadsheet saat dimuat (baris baru selalu dianggap berubah bila terisi).
+  const diubah = (r, k) => (r._asli ? String(r[k] ?? "").trim() !== String(r._asli[k] ?? "").trim() : String(r[k] ?? "").trim() !== "");
+
   // ---- Tabel input yang bisa diedit ----
   function tabelInput(el, { kolom, baris, kunci = [], teks = [], tambahBaris = false, onUbah }) {
     const render = () => {
@@ -55,9 +58,9 @@
         ${baris.map((r, i) => `<tr>${kolom.map((k) => {
           const v = S.esc(r[k] ?? "");
           if (kunci.includes(k)) return `<td class="kunci">${v}</td>`;
-          const num = !teks.includes(k);
-          return `<td><input data-i="${i}" data-k="${S.esc(k)}" value="${v}" ${num ? 'inputmode="decimal" class="num"' : ""}></td>`;
-        }).join("")}${tambahBaris ? `<td><button class="btn-kecil" data-hapus="${i}" title="Hapus baris">×</button></td>` : ""}</tr>`).join("")}
+          const kelas = [teks.includes(k) ? "" : "num", diubah(r, k) ? "ubah" : ""].join(" ").trim();
+          return `<td><input data-i="${i}" data-k="${S.esc(k)}" value="${v}" ${teks.includes(k) ? "" : 'inputmode="decimal"'} class="${kelas}"></td>`;
+        }).join("")}${tambahBaris ? `<td>${r._baris ? "" : `<button class="btn-kecil" data-hapus="${i}" title="Hapus baris baru">×</button>`}</td>` : ""}</tr>`).join("")}
         </tbody></table></div>
         ${tambahBaris ? '<button class="btn-kecil" data-tambah>+ Tambah baris</button>' : ""}`;
     };
@@ -65,7 +68,9 @@
     el.addEventListener("input", (e) => {
       const t = e.target;
       if (t.dataset.k == null) return;
-      baris[+t.dataset.i][t.dataset.k] = t.value;
+      const r = baris[+t.dataset.i];
+      r[t.dataset.k] = t.value;
+      t.classList.toggle("ubah", diubah(r, t.dataset.k));
       onUbah();
     });
     el.addEventListener("click", (e) => {
@@ -173,6 +178,9 @@
   // ---- Kerangka halaman ----
   // cfg.tabs: [{nama, judul, kunci:[kolom readonly], teks:[kolom teks], tambahBaris}]
   // cfg.param: daftar kunci parameter yang ditampilkan; cfg.hitung(ctx)
+  // Tab yang hanya bisa diubah admin langsung di spreadsheet.
+  const TAB_ADMIN = ["parameter", "standar_sarana"];
+
   async function halaman(cfg) {
     const tabs = cfg.tabs || [];
     const [paramRows, ...dataTabs] = await Promise.all([tab("parameter"), ...tabs.map((t) => tab(t.nama))]);
@@ -183,15 +191,53 @@
 
     const wadah = document.getElementById("kalkulator");
     wadah.innerHTML = `
-      <div class="notice small" id="k-mode">Angka di bawah dibaca dari Google Sheets. Mengubah angka di halaman ini hanya untuk mencoba (tidak tersimpan); perubahan tetap harus diisi di Sheets.
-        <button class="btn-kecil" id="k-reset" hidden>Kembalikan ke data Sheets</button></div>
+      <div class="notice small" id="k-mode">Isi atau ubah angka langsung di tabel input, lalu tekan <b>Simpan ke spreadsheet</b>. Sel yang berubah ditandai kuning dan hasil di bawah langsung ikut berubah. Perubahan dicatat atas nama Anda dan dicek admin. Tab bertanda <i>hanya admin</i> bisa dipakai untuk mencoba, tetapi tidak tersimpan.</div>
       <div id="k-status"></div>
-      ${tabs.map((t, i) => `<details class="card blok" ${i === 0 && !t.tertutup && dataTabs[i].length <= 30 ? "open" : ""}><summary><b>Input: ${S.esc(t.judul)}</b> <span class="small muted">tab <code>${t.nama}</code></span></summary><div id="k-in-${i}"></div></details>`).join("")}
-      ${paramTampil.length ? `<details class="card blok"><summary><b>Parameter dan standar</b> <span class="small muted">tab <code>parameter</code></span></summary><div id="k-param"></div></details>` : ""}
+      ${tabs.map((t, i) => `<details class="card blok" ${i === 0 && !t.tertutup && dataTabs[i].length <= 30 ? "open" : ""}><summary><b>Input: ${S.esc(t.judul)}</b> <span class="small muted">tab <code>${t.nama}</code>${TAB_ADMIN.includes(t.nama) ? " · hanya admin" : ""}</span></summary><div id="k-in-${i}"></div></details>`).join("")}
+      ${paramTampil.length ? `<details class="card blok"><summary><b>Parameter dan standar</b> <span class="small muted">tab <code>parameter</code> · hanya admin</span></summary><div id="k-param"></div></details>` : ""}
+      <div class="bar-simpan" id="k-simpan"><span class="pesan" id="k-pesan">Belum ada perubahan.</span>
+        <button class="btn-kecil" id="k-reset" hidden>Batalkan perubahan</button>
+        <button class="btn-utama" id="k-tombol" disabled>Simpan ke spreadsheet</button></div>
       <div id="k-hasil"></div>`;
 
     let berubah = false;
-    const ubah = () => { berubah = true; document.getElementById("k-reset").hidden = false; jalankan(); };
+    const simpanan = tabs.filter((t) => !TAB_ADMIN.includes(t.nama));
+    const kolomTab = (t) => (data[t.nama].fields?.length ? data[t.nama].fields : (t.kolom || []));
+    const kumpulkan = () => simpanan.map((t) => {
+      const f = kolomTab(t);
+      const perubahan = data[t.nama].map((r) => S.selisih(r, f)).filter(Boolean);
+      const tambah = data[t.nama].filter((r) => !r._baris && f.some((k) => String(r[k] ?? "").trim() !== ""))
+        .map((r) => Object.fromEntries(f.map((k) => [k, r[k] ?? ""])));
+      return { t, perubahan, tambah, n: perubahan.length + tambah.length };
+    }).filter((x) => x.n);
+    const pesan = document.getElementById("k-pesan"), tombol = document.getElementById("k-tombol");
+    const segarkanBar = () => {
+      const k = kumpulkan();
+      const n = k.reduce((a, x) => a + x.n, 0);
+      tombol.disabled = !n;
+      pesan.textContent = n ? `${n} baris berubah, belum disimpan.` : (berubah ? "Perubahan hanya di tab admin (tidak disimpan)." : "Belum ada perubahan.");
+    };
+    const ubah = () => { berubah = true; document.getElementById("k-reset").hidden = false; segarkanBar(); jalankan(); };
+    tombol.onclick = async () => {
+      tombol.disabled = true;
+      pesan.textContent = "Menyimpan…";
+      const laporan = [];
+      let gagal = false;
+      for (const x of kumpulkan()) {
+        try {
+          const j = await S.simpan(x.t.nama, x.perubahan, x.tambah);
+          if (!j) { pesan.textContent = "Dibatalkan."; tombol.disabled = false; return; }
+          if (!j.ok || j.konflik?.length) gagal = true;
+          laporan.push(`${x.t.judul}: ${S.ringkasHasil(j)}`);
+        } catch (e) {
+          gagal = true;
+          laporan.push(`${x.t.judul}: gagal (${e.message})`);
+        }
+      }
+      pesan.textContent = laporan.join(" ") + (gagal ? "" : " Memuat ulang data terbaru…");
+      if (!gagal) setTimeout(() => location.reload(), 1500);
+      else tombol.disabled = false;
+    };
     tabs.forEach((t, i) => {
       const kolom = data[t.nama].fields?.length ? data[t.nama].fields : (t.kolom || []);
       tabelInput(document.getElementById(`k-in-${i}`), { kolom, baris: data[t.nama], kunci: t.kunci || [], teks: t.teks || [], tambahBaris: t.tambahBaris, onUbah: ubah });

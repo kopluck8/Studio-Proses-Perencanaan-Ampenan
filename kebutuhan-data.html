@@ -10,7 +10,7 @@
 <main>
   <div class="page-head">
     <h1>Kebutuhan Data</h1>
-    <p class="muted">Kolom <b>Kondisi</b> diisi bidang penanggung jawab. Kolom <b>Verifikasi</b> hanya dapat dicentang oleh Deo di Google Sheets.</p>
+    <p class="muted">Bidang penanggung jawab memilih <b>Kondisi</b> dan menulis catatan langsung di tabel, lalu menekan <b>Simpan ke spreadsheet</b>. Kolom <b>Verifikasi</b> hanya dapat dicentang oleh admin di Google Sheets.</p>
   </div>
 
   <div class="grid grid-4" id="ringkas"></div>
@@ -18,7 +18,7 @@
   <div class="grid grid-2" style="margin-top:1rem">
     <div class="card">
       <h2>Progres per aspek</h2>
-      <p class="muted small">Batang gelap = data ada lengkap · batang muda = sudah diverifikasi Deo</p>
+      <p class="muted small">Batang gelap = data ada lengkap · batang muda = sudah diverifikasi admin</p>
       <div id="per-aspek"></div>
     </div>
     <div class="card">
@@ -42,7 +42,7 @@
     <span class="muted small" id="jumlah"></span>
   </div>
   <div class="table-wrap">
-    <table>
+    <table class="tabel-isi">
       <thead><tr>
         <th>ID</th><th>Aspek</th><th>Data</th><th>Format</th><th>Sumber</th><th>Dipakai untuk</th>
         <th>Bidang PJ</th><th>Kondisi</th><th>Catatan</th><th>Verifikasi</th>
@@ -50,6 +50,7 @@
       <tbody id="tabel"></tbody>
     </table>
   </div>
+  <div id="bar"></div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="assets/js/common.js"></script>

@@ -6,6 +6,7 @@
     "ada lengkap": "ok", "ada sebagian": "warn", "sudah diminta": "info",
     "belum ada": "neutral", "tidak tersedia": "bad",
   };
+  const KONDISI = ["Belum ada", "Sudah diminta", "Ada sebagian", "Ada lengkap", "Tidak tersedia"];
   const lengkap = (d) => (d.kondisi || "").toLowerCase() === "ada lengkap";
   const cek = (d) => benar(d.ceklis_deo);
   const antri = (d) => lengkap(d) && !cek(d);
@@ -19,7 +20,7 @@
   document.getElementById("ringkas").innerHTML = [
     ["Total item data", total, ""],
     ["Ada lengkap", nLengkap, `${persen(nLengkap, total)}% · ${nSebagian} ada sebagian`],
-    ["Terverifikasi Deo", nCek, `${persen(nCek, total)}% dari total`],
+    ["Terverifikasi admin", nCek, `${persen(nCek, total)}% dari total`],
     ["Antrean verifikasi", nAntri, "lengkap tapi belum dicentang"],
   ].map(([l, v, s]) => `<div class="card stat"><div class="label">${l}</div><div class="value">${v}</div><div class="sub">${s}</div></div>`).join("");
 
@@ -65,16 +66,28 @@
       const verif = cek(d)
         ? `<span class="cek ya" title="Diverifikasi ${esc(d.tanggal_ceklis)}">✓</span> <span class="small muted">${esc(d.tanggal_ceklis)}</span>`
         : `<span class="cek tidak">☐</span>`;
+      const i = data.indexOf(d);
+      const ubah = (k) => (d._asli && String(d[k] ?? "") !== String(d._asli[k] ?? "") ? "ubah" : "");
+      const pilihan = [...new Set([...KONDISI, d.kondisi].filter(Boolean))];
       return `<tr class="${antri(d) ? "antri" : ""}">
         <td>${esc(d.id)}</td><td>${esc(d.aspek)}</td>
         <td><b>${esc(d.data)}</b><br><span class="small muted">${esc(d.rincian_variabel)}</span></td>
         <td>${esc(d.format)}</td>
         <td>${esc(d.sumber_instansi)}<br><span class="small muted">${esc(d.metode)}</span></td>
         <td class="small">${esc(d.dipakai_untuk)}</td><td>${esc(d.bidang_pj)}</td>
-        <td><span class="pill ${kelas}">${esc(d.kondisi || "Belum ada")}</span></td>
-        <td class="small">${esc(d.catatan_kondisi)}</td><td>${verif}</td></tr>`;
+        <td><span class="pill ${kelas}">${esc(d.kondisi || "Belum ada")}</span>
+          <select data-i="${i}" data-k="kondisi" class="${ubah("kondisi")}" style="margin-top:.3rem"><option value="">(pilih)</option>${pilihan.map((v) => `<option${v === d.kondisi ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></td>
+        <td><input data-i="${i}" data-k="catatan_kondisi" value="${esc(d.catatan_kondisi)}" class="${ubah("catatan_kondisi")}"></td><td>${verif}</td></tr>`;
     }).join("");
   }
+  const segarkan = Studio.barSimpan(document.getElementById("bar"), { tab: "kebutuhan_data", baris: data });
+  document.getElementById("tabel").addEventListener("input", (e) => {
+    const el = e.target, d = data[+el.dataset.i];
+    if (!d || !el.dataset.k) return;
+    d[el.dataset.k] = el.value;
+    el.classList.toggle("ubah", String(d[el.dataset.k] ?? "") !== String(d._asli[el.dataset.k] ?? ""));
+    segarkan();
+  });
   [fA, fB, fK, fC].forEach((el) => el.addEventListener("change", render));
   fQ.addEventListener("input", render);
   render();

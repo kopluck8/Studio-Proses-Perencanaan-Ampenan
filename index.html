@@ -57,7 +57,7 @@
     ["Sesi berjalan", kini ? `${kini.sesi} / ${jadwal.length}` : "-", kini ? S.esc(kini.kegiatan) : ""],
     ["Menuju presentasi akhir", `${sisaHari} hari`, S.formatTanggal(akhir)],
     ["Tugas selesai", `${nSelesai} / ${tugas.length}`, `${S.persen(nSelesai, tugas.length)}%`],
-    ["Data ada lengkap", `${nLengkap} / ${data.length}`, `${nCek} sudah diverifikasi Deo`],
+    ["Data ada lengkap", `${nLengkap} / ${data.length}`, `${nCek} sudah diverifikasi admin`],
     ["Foto survei", foto.length, `${nKet} sudah berketerangan · <a href="peta-survei.html">lihat peta</a>`],
   ].map(([l, v, s]) => `<div class="card stat"><div class="label">${l}</div><div class="value">${v}</div><div class="sub">${s}</div></div>`).join("");
 
@@ -85,7 +85,7 @@
   const isi = [];
   if (hambat.length) isi.push(`<p><span class="pill bad">Terhambat</span> ${hambat.map((t) => S.esc(t.judul)).join(", ")}</p>`);
   if (telat.length) isi.push(`<p><span class="pill warn">Lewat tenggat</span> ${telat.map((t) => S.esc(t.judul)).join(", ")}</p>`);
-  if (antri.length) isi.push(`<p><span class="pill info">Menunggu verifikasi Deo</span> ${antri.map((d) => S.esc(d.data)).join(", ")}</p>`);
+  if (antri.length) isi.push(`<p><span class="pill info">Menunggu verifikasi admin</span> ${antri.map((d) => S.esc(d.data)).join(", ")}</p>`);
   if (foto.length - nKet) isi.push(`<p><span class="pill neutral">Foto survei</span> ${foto.length - nKet} foto belum diberi kategori/keterangan.</p>`);
   document.getElementById("perhatian").innerHTML = isi.join("") || `<p class="muted">Tidak ada.</p>`;
 })();

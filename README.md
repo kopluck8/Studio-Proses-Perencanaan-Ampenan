@@ -9,7 +9,7 @@ Halaman:
 | Beranda (`index.html`) | Ringkasan sesi, tugas, data, foto survei | semua tab |
 | Jadwal (`jadwal.html`) | 12 sesi dan milestone | tab `jadwal` |
 | Tugas (`tugas.html`) | Tugas per bidang dan PJ | tab `tugas` |
-| Kebutuhan Data (`kebutuhan-data.html`) | Daftar 49 data, kondisi, verifikasi Deo | tab `kebutuhan_data` |
+| Kebutuhan Data (`kebutuhan-data.html`) | Daftar 49 data, kondisi, verifikasi admin | tab `kebutuhan_data` |
 | Peta Survei (`peta-survei.html`) | Titik foto survei lapangan dengan popup foto | `data/survei/survei_foto.csv` + tab `survei_foto` |
 | Analisis (`analisis/`) | Kalkulator analisis 6 aspek dan tahap 2–4 | tab input per kalkulator |
 
@@ -25,14 +25,21 @@ Situs ini statis (HTML, CSS, JavaScript tanpa proses build) dan dijalankan oleh 
 
 Semua data progres dan input kalkulator diisi tim di satu Google Sheets. Tidak perlu impor CSV atau menyalin URL per tab.
 
-1. Buat Google Sheets baru (dengan akun Deo).
+1. Buat Google Sheets baru (dengan akun admin).
 2. **Ekstensi → Apps Script**. Hapus isi `Code.gs`, tempel seluruh isi [`apps-script/Kode.gs`](apps-script/Kode.gs), lalu **Simpan**.
 3. Kembali ke Sheets dan muat ulang halaman. Menu **Dashboard Studio** muncul.
-4. Jalankan **1. Siapkan semua tab**. Pertama kali Google meminta izin; pilih akun, **Lanjutan → Buka (tidak aman)**, lalu **Izinkan** (skrip ini milik Deo sendiri). Skrip membuat 25 tab, mengisi isi awalnya langsung dari repo, menambah dropdown dan kotak centang, serta mengunci baris judul dengan peringatan.
-5. Jalankan **2. Kunci kolom ceklis untuk saya**. Kolom `ceklis_deo` dan `tanggal_ceklis` hanya bisa diubah akun Deo. Saat Deo mencentang, `tanggal_ceklis` terisi otomatis.
+4. Jalankan **1. Siapkan semua tab**. Pertama kali Google meminta izin; pilih akun, **Lanjutan → Buka (tidak aman)**, lalu **Izinkan** (skrip ini milik admin sendiri). Skrip membuat 25 tab, mengisi isi awalnya langsung dari repo, menambah dropdown dan kotak centang, serta mengunci baris judul dengan peringatan.
+5. Jalankan **2. Kunci kolom ceklis untuk saya**. Kolom `ceklis_deo` dan `tanggal_ceklis` hanya bisa diubah akun admin. Saat admin mencentang, `tanggal_ceklis` terisi otomatis.
 6. Jalankan **3. Bagikan agar dashboard bisa membaca**. Spreadsheet bisa dilihat siapa pun yang punya link (mengedit tetap hanya untuk yang diundang), lalu ID spreadsheet ditampilkan.
 7. Tempel ID itu di `data/config.json`: `"google_sheets_id": "ID_SPREADSHEET"`, lalu commit.
-8. Undang anggota tim sebagai editor lewat tombol **Bagikan**.
+8. Pasang penerima data supaya tim bisa mengisi dari dashboard: di editor Apps Script pilih **Deploy → New deployment → Web app**, isi **Execute as: Me** dan **Who has access: Anyone**, lalu **Deploy**. Salin alamat `.../exec` ke `data/config.json` pada `"apps_script_url"`. Setiap kali `Kode.gs` diperbarui: **Deploy → Manage deployments → Edit (ikon pensil) → Version: New version → Deploy**; alamatnya tetap sama.
+
+### Alur isian tim dan verifikasi admin
+
+- Anggota tim **tidak perlu akses edit** ke spreadsheet. Mereka mengisi di dashboard: tabel input kalkulator, kolom status/catatan di halaman Tugas, kondisi di Kebutuhan Data, dan tombol **Isi keterangan** di popup Peta Survei. Saat pertama menyimpan, dashboard menanyakan nama pengisi (diingat di browser itu).
+- Penerima data menulis ke spreadsheet atas nama admin dan mencatat setiap perubahan di tab `log_perubahan` (waktu, pengisi, tab, baris, kolom, nilai lama, nilai baru, kotak `dicek_admin`). Admin memeriksa dan merapikan langsung di spreadsheet; perbaikan admin langsung tampil di dashboard.
+- Kolom yang boleh diisi tim diatur di `BOLEH` pada `Kode.gs`. Tab `parameter` dan `standar_sarana`, kolom `ceklis_deo`/`tanggal_ceklis`, serta `luas_ha` kelurahan hanya bisa diubah admin. Menghapus baris juga hanya oleh admin.
+- Bila admin mengubah baris yang sedang diisi anggota, penyimpanan anggota untuk baris itu ditolak dengan pesan "muat ulang", supaya perbaikan admin tidak tertimpa.
 
 Setelah itu dashboard membaca Sheets langsung setiap kali halaman dibuka; perubahan di Sheets langsung terlihat setelah halaman dimuat ulang. Bagian bawah setiap halaman menulis sumber datanya ("Google Sheets (langsung)" atau "salinan repo"). Bila satu tab tidak ditemukan, dashboard memakai salinan di `data/sheets/`.
 
