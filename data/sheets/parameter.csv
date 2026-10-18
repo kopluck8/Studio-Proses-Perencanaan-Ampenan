@@ -1,0 +1,48 @@
+kunci,nilai,satuan,keterangan
+tahun_proyeksi,"2026,2031,2036,2041,2046",tahun,Tahun proyeksi (pisahkan dengan koma)
+metode_proyeksi,otomatis,-,"otomatis (simpangan baku terkecil), aritmatik, geometrik, atau eksponensial"
+laju_proyeksi,kelurahan,-,"kelurahan (laju tiap kelurahan) atau kecamatan (satu laju untuk semua, seperti template)"
+kepadatan_rendah_maks,150,jiwa/ha,SNI 03-1733-2004: batas atas kepadatan rendah
+kepadatan_sedang_maks,200,jiwa/ha,SNI 03-1733-2004: batas atas kepadatan sedang
+kepadatan_tinggi_maks,400,jiwa/ha,SNI 03-1733-2004: batas atas kepadatan tinggi (di atasnya sangat padat)
+jiwa_per_kk,4,jiwa/KK,Rata-rata anggota rumah tangga (template)
+porsi_kavling_kecil,50,%,Komposisi rumah kavling kecil
+porsi_kavling_sedang,33,%,Komposisi rumah kavling sedang
+porsi_kavling_besar,17,%,Komposisi rumah kavling besar
+luas_kavling_kecil,37.5,m²,"(21+54)/2, template"
+luas_kavling_sedang,85,m²,"(70+100)/2, template"
+luas_kavling_besar,160,m²,"(120+200)/2, template"
+listrik_va_per_kk,900,VA/KK,Kebutuhan listrik rumah tangga
+listrik_industri_dagang,75,% RT,Industri dan perdagangan terhadap kebutuhan rumah tangga
+listrik_fasos_ekonomi,15,% RT,Fasilitas sosial-ekonomi
+listrik_perkantoran,10,% RT,Perkantoran
+listrik_penerangan_jalan,1,% RT,Penerangan jalan
+listrik_cadangan,5,% RT,Cadangan
+air_liter_per_orang,150,L/orang/hari,"Domestik (kota sedang 130–150, kota besar 150–170)"
+air_fasum,2,% domestik,Non-domestik fasilitas umum
+air_kantor,2,% domestik,Non-domestik perkantoran
+air_komersial,3,% domestik,Non-domestik komersial
+air_industri,3,% domestik,Non-domestik industri
+air_hidran,10,% (D+ND),Hidran kebakaran
+air_kehilangan,20,% (D+ND),Kehilangan air
+air_faktor_maks_harian,1.15,kali,Faktor kebutuhan maksimum harian
+limbah_persen_air,70,% air domestik,Air limbah domestik dari pemakaian air bersih
+limbah_industri,27,% limbah,Porsi buangan industri (pembagian dari total)
+limbah_perumahan,33,% limbah,Porsi buangan perumahan
+limbah_sosek,40,% limbah,Porsi buangan sosial-ekonomi
+sampah_liter_per_jiwa,2.5,L/jiwa/hari,Timbulan sampah (volume)
+sampah_kg_per_jiwa,0.5,kg/jiwa/hari,Timbulan sampah (berat)
+sampah_jiwa_per_kontainer,3200,jiwa/unit,Kontainer
+sampah_jiwa_per_tps3r,2500,jiwa/unit,TPS 3R
+sampah_jiwa_per_bank_sampah,3000,jiwa/unit,Bank sampah
+sampah_jiwa_per_truk,3200,jiwa/unit,Dump truck
+telkom_sst_per_100_jiwa,17,sst/100 jiwa,Sambungan perumahan
+telkom_dp_per_sst,8,DP/sst,Distribusi poin per sambungan (template)
+telkom_sst_per_rumah_kabel,500,sst/unit,Rumah kabel
+telkom_non_perumahan,25,% perumahan,Sambungan non-perumahan
+sentralitas_bobot_total,100,-,Nilai t pada bobot fasilitas C = t/T
+sentralitas_jumlah_orde,3,kelas,Jumlah orde pusat pelayanan (interval sama)
+rth_publik_target,20,% luas wilayah,UU 26/2007
+rth_privat_target,10,% luas wilayah,UU 26/2007
+dddtl_alfa,26,m²/kapita,Kebutuhan lahan permukiman per kapita
+ahp_cr_maks,0.1,-,Batas rasio konsistensi

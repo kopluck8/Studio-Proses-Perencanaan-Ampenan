@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proyeksi Penduduk · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Proyeksi Penduduk</h1>
+    <p class="muted">Aspek Demografi · PJ Bidang Sosial, Budaya &amp; Kependudukan. Isi jumlah penduduk per kelurahan di tab <code>penduduk_seri</code> (boleh ada tahun yang kosong). Kolom tahun bisa ditambah atau diganti.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <p>Laju pertumbuhan dihitung dari tahun data pertama (P₀) dan terakhir (Pₜ) dengan selisih tahun sebenarnya t:</p>
+    <ul>
+      <li>Aritmatik: <code>r = (Pₜ/P₀ − 1)/t</code>, <code>Pₙ = Pₜ (1 + r·n)</code></li>
+      <li>Geometrik: <code>r = (Pₜ/P₀)^(1/t) − 1</code>, <code>Pₙ = Pₜ (1 + r)ⁿ</code></li>
+      <li>Eksponensial: <code>r = ln(Pₜ/P₀)/t</code>, <code>Pₙ = Pₜ·e^(r·n)</code></li>
+    </ul>
+    <p>n = tahun proyeksi − tahun data terakhir. Mode <b>otomatis</b> memilih metode dengan simpangan baku terkecil antara hasil hitung balik dan data historis. Sumber: template Excel dosen (sheet "Proyeksi Penduduk per Desa") dan proposal Bab 3.3.2.</p>
+    <p class="small muted">Perbaikan dari template: proyeksi tahun ke-15 dan ke-20 di template memakai basis tahun ke-5, dan laju dihitung seolah semua tahun berurutan walau ada tahun yang hilang. Di sini setiap tahun proyeksi dihitung dari tahun data terakhir dengan selisih tahun yang sebenarnya.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+K.halaman({
+  tabs: [{ nama: "penduduk_seri", judul: "Jumlah penduduk per tahun", kunci: ["kelurahan"] }],
+  param: ["tahun_proyeksi", "metode_proyeksi", "laju_proyeksi"],
+  hitung({ data, p, el }) {
+    const pr = K.proyeksi(data.penduduk_seri, p);
+    const siap = pr.hasil.filter((h) => h.metode);
+    if (!siap.length) {
+      el.innerHTML = K.pesanKosong("Isi minimal dua tahun data penduduk untuk satu kelurahan atau lebih di tab penduduk_seri.");
+      return;
+    }
+    const total = (t) => siap.reduce((a, h) => a + (h.nilai[t] || 0), 0);
+    const tahunDasar = Math.max(...siap.map((h) => h.tahunDasar));
+    const totalDasar = siap.reduce((a, h) => a + h.dasar, 0);
+    const akhir = pr.target[pr.target.length - 1];
+    el.innerHTML = `
+      <div class="card blok"><h2>Hasil proyeksi</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Penduduk ${tahunDasar}</span><b>${K.fmt(totalDasar)}</b></div>
+          <div><span class="small muted">Proyeksi ${akhir}</span><b>${K.fmt(total(akhir))}</b></div>
+          <div><span class="small muted">Kelurahan terhitung</span><b>${siap.length} / ${pr.hasil.length}</b></div>
+        </div>
+        <div id="t-hasil"></div>
+        <div class="grafik"><canvas id="g-proyeksi"></canvas></div>
+      </div>
+      <div class="card blok"><h2>Laju pertumbuhan dan pemilihan metode</h2><div id="t-laju"></div></div>`;
+    K.tabelHasil(document.getElementById("t-hasil"), {
+      kolom: ["Kelurahan", "Tahun dasar", "Penduduk dasar", "Metode", ...pr.target.map(String), `Proporsi ${akhir} (%)`],
+      baris: [
+        ...pr.hasil.map((h) => [h.kelurahan, h.tahunDasar ? String(h.tahunDasar) : "–", h.dasar, h.metode || "data kurang",
+          ...pr.target.map((t) => h.nilai[t] ?? NaN), h.metode ? (h.nilai[akhir] / total(akhir)) * 100 : NaN]),
+        ["Kecamatan Ampenan", String(tahunDasar), totalDasar, "", ...pr.target.map(total), 100],
+      ],
+      desimal: [0, 0, 0, 0, ...pr.target.map(() => 0), 2],
+      namaFile: "proyeksi-penduduk",
+      catatan: pr.lajuKec ? "Satu laju kecamatan dipakai untuk semua kelurahan." : "Laju dihitung per kelurahan.",
+    });
+    K.tabelHasil(document.getElementById("t-laju"), {
+      kolom: ["Kelurahan", "Periode data", "r aritmatik (%)", "r geometrik (%)", "r eksponensial (%)", "SB aritmatik", "SB geometrik", "SB eksponensial", "Dipakai"],
+      baris: siap.map((h) => [h.kelurahan, `${h.pts[0][0]}–${h.pts[h.pts.length - 1][0]} (${h.pts.length} titik)`,
+        h.laju.aritmatik.r * 100, h.laju.geometrik.r * 100, h.laju.eksponensial.r * 100,
+        h.laju.aritmatik.sd, h.laju.geometrik.sd, h.laju.eksponensial.sd, h.metode]),
+      desimal: [0, 0, 3, 3, 3, 1, 1, 1, 0],
+      namaFile: "laju-pertumbuhan",
+      catatan: "SB = simpangan baku selisih hitung balik terhadap data historis; makin kecil makin cocok.",
+    });
+    K.grafik("g-proyeksi", {
+      type: "line",
+      data: { datasets: siap.map((h, i) => {
+        const titik = [...h.pts.map(([x, y]) => ({ x, y })), ...pr.target.filter((t) => t > h.tahunDasar).map((t) => ({ x: t, y: h.nilai[t] }))];
+        return {
+          label: h.kelurahan, borderColor: K.WARNA[i % 10], backgroundColor: K.WARNA[i % 10], tension: 0, pointRadius: 2, data: titik,
+          segment: { borderDash: (c) => (titik[c.p1DataIndex].x > h.tahunDasar ? [5, 4] : undefined) },
+        };
+      }) },
+      options: { scales: { x: { type: "linear", ticks: { stepSize: 5, callback: (v) => String(v) } } }, plugins: { legend: { position: "bottom" }, title: { display: true, text: "Penduduk per kelurahan (garis putus = proyeksi)" } } },
+    });
+  },
+});
+</script>
+</body>
+</html>

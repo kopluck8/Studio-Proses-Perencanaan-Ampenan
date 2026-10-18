@@ -50,7 +50,7 @@
       Papa.parse(url, {
         download: true, header: true, skipEmptyLines: true,
         transformHeader: (h) => h.trim(),
-        complete: (r) => resolve(r.data),
+        complete: (r) => { r.data.fields = (r.meta.fields || []).map((f) => f.trim()); resolve(r.data); },
         error: reject,
       });
     });
