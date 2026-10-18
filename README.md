@@ -21,31 +21,22 @@ Situs ini statis (HTML, CSS, JavaScript tanpa proses build) dan dijalankan oleh 
 2. Pada **Build and deployment**, pilih **Deploy from a branch**, cabang `main`, folder `/ (root)`, lalu **Save**.
 3. Setelah satu-dua menit situs tampil di `https://kopluck8.github.io/Studio-Proses-Perencanaan-Ampenan/`.
 
-## 2. Menghubungkan Google Sheets
+## 2. Menghubungkan Google Sheets (otomatis dengan Apps Script)
 
-Data progres diisi seluruh tim di satu Google Sheets. Dashboard membaca tiap tab sebagai CSV.
+Semua data progres dan input kalkulator diisi tim di satu Google Sheets. Tidak perlu impor CSV atau menyalin URL per tab.
 
-1. Buat Google Sheets baru, lalu buat tab dengan nama persis: `jadwal`, `tugas`, `kebutuhan_data`, `survei_foto`.
-2. Isi tiap tab dengan mengimpor file awal dari folder `data/sheets/` (**File → Impor → Unggah → Ganti sheet saat ini**). Baris pertama (judul kolom) jangan diubah.
-3. **File → Bagikan → Publikasikan ke web**. Pilih satu tab, format **Nilai yang dipisahkan koma (.csv)**, lalu **Publikasikan**. Salin URL-nya. Ulangi untuk setiap tab.
-4. Tempel tiap URL di `data/config.json` pada bagian `google_sheets`, misalnya:
-   ```json
-   "google_sheets": {
-     "jadwal": "https://docs.google.com/spreadsheets/d/e/.../pub?gid=0&single=true&output=csv",
-     "tugas": "https://docs.google.com/spreadsheets/d/e/.../pub?gid=123&single=true&output=csv",
-     ...
-   }
-   ```
-5. Selesai. Perubahan di Sheets muncul di dashboard dalam beberapa menit (Google menyegarkan CSV terbitan sekitar tiap 5 menit). Bila URL dikosongkan, dashboard memakai salinan lokal di `data/sheets/`.
+1. Buat Google Sheets baru (dengan akun Deo).
+2. **Ekstensi → Apps Script**. Hapus isi `Code.gs`, tempel seluruh isi [`apps-script/Kode.gs`](apps-script/Kode.gs), lalu **Simpan**.
+3. Kembali ke Sheets dan muat ulang halaman. Menu **Dashboard Studio** muncul.
+4. Jalankan **1. Siapkan semua tab**. Pertama kali Google meminta izin; pilih akun, **Lanjutan → Buka (tidak aman)**, lalu **Izinkan** (skrip ini milik Deo sendiri). Skrip membuat 25 tab, mengisi isi awalnya langsung dari repo, menambah dropdown dan kotak centang, serta mengunci baris judul dengan peringatan.
+5. Jalankan **2. Kunci kolom ceklis untuk saya**. Kolom `ceklis_deo` dan `tanggal_ceklis` hanya bisa diubah akun Deo. Saat Deo mencentang, `tanggal_ceklis` terisi otomatis.
+6. Jalankan **3. Bagikan agar dashboard bisa membaca**. Spreadsheet bisa dilihat siapa pun yang punya link (mengedit tetap hanya untuk yang diundang), lalu ID spreadsheet ditampilkan.
+7. Tempel ID itu di `data/config.json`: `"google_sheets_id": "ID_SPREADSHEET"`, lalu commit.
+8. Undang anggota tim sebagai editor lewat tombol **Bagikan**.
 
-### Mengunci kolom ceklis supaya hanya Deo yang bisa mencentang
+Setelah itu dashboard membaca Sheets langsung setiap kali halaman dibuka; perubahan di Sheets langsung terlihat setelah halaman dimuat ulang. Bagian bawah setiap halaman menulis sumber datanya ("Google Sheets (langsung)" atau "salinan repo"). Bila satu tab tidak ditemukan, dashboard memakai salinan di `data/sheets/`.
 
-1. Di tab `kebutuhan_data`, blok kolom `ceklis_deo` dan `tanggal_ceklis`.
-2. **Data → Lindungi sheet dan rentang → Tambahkan sheet atau rentang**, beri nama "Ceklis Deo".
-3. **Setel izin → Batasi siapa yang dapat mengedit rentang ini → Khusus Anda**, lalu **Selesai**.
-4. Supaya mudah dicentang, blok kolom `ceklis_deo` lalu **Sisipkan → Kotak centang**. Dashboard menganggap TRUE, ya, 1, ✓, v, atau x sebagai sudah diverifikasi.
-
-Anggota tim tetap bisa mengubah kolom lain (misalnya `kondisi` dan `catatan_kondisi`), tetapi tidak bisa mencentang verifikasi.
+Menu **Isi ulang satu tab dari repo** menimpa satu tab dengan isi awal dari repo, berguna bila sebuah tab rusak atau ada kolom baru.
 
 ### Isian yang diterima
 
@@ -63,7 +54,7 @@ Tanggal ditulis `YYYY-MM-DD` atau `DD/MM/YYYY`.
 
 Setiap kalkulator di folder `analisis/` membaca satu atau beberapa tab Sheets, menghitung dengan rumus di `assets/js/`, lalu menampilkan tabel hasil (bisa diunduh CSV) dan grafik. Angka juga bisa diubah langsung di halaman untuk mencoba saat diskusi, tetapi perubahan itu tidak tersimpan.
 
-Buat tab dengan nama persis seperti nama file di `data/sheets/` (impor file awalnya), publikasikan sebagai CSV, lalu tempel URL-nya di `data/config.json` seperti langkah 2. Daftar tab dan kalkulator yang memakainya:
+Semua tab di bawah dibuat otomatis oleh Apps Script (langkah 2). Daftar tab dan kalkulator yang memakainya:
 
 | Tab | Diisi bidang | Dipakai kalkulator |
 |---|---|---|

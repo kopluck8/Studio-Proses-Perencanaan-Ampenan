@@ -24,8 +24,10 @@
       <nav class="nav">${nav}</nav></div>`;
     document.body.prepend(header);
     const footer = document.createElement("footer");
-    footer.innerHTML = "Studio Proses Perencanaan PWKL4205 · Prodi PWK Universitas Terbuka · UPBJJ Mataram · Kecamatan Ampenan, Kota Mataram";
+    footer.innerHTML = "Studio Proses Perencanaan PWKL4205 · Prodi PWK Universitas Terbuka · UPBJJ Mataram · Kecamatan Ampenan, Kota Mataram<span id=\"sumber-data\"></span>";
     document.body.append(footer);
+    const k = Object.keys(sumber)[0];
+    if (k) tandaiSumber(k, sumber[k]);
   }
 
   let configCache = null;
@@ -37,23 +39,63 @@
     return configCache;
   }
 
-  // Membaca satu tab: dari Google Sheets bila URL CSV-nya diisi di config.json,
-  // bila tidak dari salinan lokal data/sheets/<nama>.csv.
+  // Membaca satu tab. Urutan sumber:
+  // 1. URL CSV khusus tab di config.json google_sheets.<nama>;
+  // 2. spreadsheet dari google_sheets_id (dibaca lewat gviz, spreadsheet harus bisa dilihat siapa pun yang punya link);
+  // 3. salinan lokal data/sheets/<nama>.csv bila Sheets gagal dibaca.
+  const sumber = {};
   async function bacaTab(nama) {
     const cfg = await config();
-    const url = (cfg.google_sheets && cfg.google_sheets[nama]) || `${ROOT}/data/sheets/${nama}.csv`;
-    return bacaCSV(url);
+    const lokal = `${ROOT}/data/sheets/${nama}.csv`;
+    const khusus = cfg.google_sheets && cfg.google_sheets[nama];
+    const id = cfg.google_sheets_id;
+    const url = khusus || (id ? `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(nama)}` : "");
+    if (url) {
+      try {
+        const [teks, cadangan] = await Promise.all([ambilTeks(url), ambilTeks(lokal).catch(() => "")]);
+        const data = uraiCSV(teks);
+        // gviz mengembalikan tab pertama bila nama tab tidak ada, jadi cocokkan kolom pertama dengan salinan lokal.
+        const kolomLokal = cadangan ? uraiCSV(cadangan).fields : [];
+        if (data.fields.length && (!kolomLokal.length || kolomLokal[0] === data.fields[0])) {
+          tandaiSumber(nama, "sheets");
+          return data;
+        }
+        console.warn(`Tab "${nama}" di Google Sheets tidak ditemukan atau kolomnya berbeda; memakai salinan repo.`);
+      } catch (e) {
+        console.warn(`Tab "${nama}" gagal dibaca dari Google Sheets; memakai salinan repo.`, e);
+      }
+    }
+    tandaiSumber(nama, "lokal");
+    return uraiCSV(await ambilTeks(lokal));
   }
 
-  function bacaCSV(url) {
-    return new Promise((resolve, reject) => {
-      Papa.parse(url, {
-        download: true, header: true, skipEmptyLines: true,
-        transformHeader: (h) => h.trim(),
-        complete: (r) => { r.data.fields = (r.meta.fields || []).map((f) => f.trim()); resolve(r.data); },
-        error: reject,
-      });
-    });
+  async function ambilTeks(url) {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`${res.status} ${url}`);
+    const teks = await res.text();
+    if (/^\s*<(!doctype|html)/i.test(teks)) throw new Error(`Bukan CSV: ${url}`);
+    return teks;
+  }
+
+  function uraiCSV(teks) {
+    const r = Papa.parse(teks.replace(/^\ufeff/, ""), { header: true, skipEmptyLines: "greedy", transformHeader: (h) => h.trim() });
+    r.data.fields = (r.meta.fields || []).map((f) => f.trim());
+    return r.data;
+  }
+
+  async function bacaCSV(url) {
+    return uraiCSV(await ambilTeks(url));
+  }
+
+  function tandaiSumber(nama, asal) {
+    sumber[nama] = asal;
+    const el = document.getElementById("sumber-data");
+    if (!el) return;
+    const nilai = Object.values(sumber);
+    const nSheets = nilai.filter((v) => v === "sheets").length;
+    el.textContent = nSheets === nilai.length ? " · Data: Google Sheets (langsung)"
+      : nSheets ? ` · Data: Google Sheets (${nSheets} tab), salinan repo (${nilai.length - nSheets} tab)`
+      : " · Data: salinan repo (Google Sheets belum terhubung)";
   }
 
   async function bacaJSON(path) {
