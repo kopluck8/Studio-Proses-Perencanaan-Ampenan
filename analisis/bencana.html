@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keterpaparan Bencana · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Keterpaparan Bencana</h1>
+    <p class="muted">Aspek Fisik &amp; Lingkungan (kebencanaan) · PJ Bidang Kebencanaan. Isi luas wilayah rawan per kelurahan di tab <code>bencana</code> (hasil overlay QGIS); luas kelurahan dibaca dari tab <code>kelurahan</code>.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>Keterpaparan: <code>% terpapar = luas rawan (ha) / luas kelurahan (ha) × 100</code>, untuk abrasi, banjir/genangan, rob, dan tsunami.</li>
+      <li>Garis pantai terdampak: <code>panjang terdampak / panjang garis pantai × 100</code>.</li>
+      <li>Laju abrasi: <code>(luas daratan tahun awal − luas daratan tahun akhir) / (tahun akhir − tahun awal)</code> dalam ha/tahun (positif berarti daratan berkurang).</li>
+    </ul>
+    <p>Data: Kajian/Peta Risiko Bencana BPBD Kota Mataram, inaRISK BNPB, citra dua titik tahun untuk garis pantai, dan survei geotagging garis abrasi (Bintaro) serta titik genangan. Luas per kelurahan dihitung di QGIS (overlay peta rawan dengan batas kelurahan). Sumber metode: proposal Bab 3.3, aspek Fisik &amp; Lingkungan (kebencanaan pesisir dan hidrometeorologi).</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+const BAHAYA = [["rawan_abrasi_ha", "Abrasi"], ["rawan_banjir_ha", "Banjir/genangan"], ["rawan_rob_ha", "Rob"], ["rawan_tsunami_ha", "Tsunami"]];
+K.halaman({
+  tabs: [
+    { nama: "bencana", judul: "Luas rawan bencana per kelurahan", kunci: ["kelurahan"] },
+    { nama: "kelurahan", judul: "Luas kelurahan", kunci: ["kelurahan"] },
+  ],
+  hitung({ data, el }) {
+    const luas = {};
+    data.kelurahan.forEach((r) => { luas[r.kelurahan] = K.angka(r.luas_ha); });
+    const rows = K.urutKel(data.bencana);
+    const st = K.statusIsi(rows, BAHAYA.map((b) => b[0]));
+    if (!st.isi) {
+      el.innerHTML = K.pesanKosong("Isi luas wilayah rawan (ha) per kelurahan di tab bencana, hasil overlay peta KRB BPBD / inaRISK dengan batas kelurahan di QGIS.");
+      return;
+    }
+    const pct = (a, b) => (K.ada(a) && K.ada(b) && b > 0 ? (a / b) * 100 : NaN);
+    const hasil = rows.map((r) => {
+      const L = luas[r.kelurahan];
+      const ha = BAHAYA.map(([k]) => K.angka(r[k]));
+      const gp = K.angka(r.garis_pantai_km), gpt = K.angka(r.garis_pantai_terdampak_km);
+      const t0 = K.angka(r.tahun_awal), t1 = K.angka(r.tahun_akhir);
+      const l0 = K.angka(r.luas_daratan_awal_ha), l1 = K.angka(r.luas_daratan_akhir_ha);
+      const laju = K.ada(t0) && K.ada(t1) && t1 > t0 && K.ada(l0) && K.ada(l1) ? (l0 - l1) / (t1 - t0) : NaN;
+      return { kel: r.kelurahan, L, ha, persen: ha.map((h) => pct(h, L)), gp, gpt, gpPersen: pct(gpt, gp), laju };
+    });
+    const jumlah = (f) => { const v = hasil.map(f).filter(K.ada); return v.length ? v.reduce((a, b) => a + b, 0) : NaN; };
+    const Ltot = jumlah((h) => h.L);
+    const haTot = BAHAYA.map((_, i) => jumlah((h) => h.ha[i]));
+    const gpTot = jumlah((h) => h.gp), gptTot = jumlah((h) => h.gpt);
+
+    el.innerHTML = `
+      <div class="card blok"><h2>Keterpaparan per kelurahan</h2>
+        <div class="hasil-ringkas">
+          ${BAHAYA.map(([, n], i) => `<div><span class="small muted">Rawan ${n}</span><b>${K.fmt(haTot[i], 1)} ha</b><span class="small muted">${K.fmt(pct(haTot[i], Ltot), 1)}% kecamatan</span></div>`).join("")}
+          <div><span class="small muted">Garis pantai terdampak</span><b>${K.fmt(gptTot, 2)} km</b><span class="small muted">${K.fmt(pct(gptTot, gpTot), 1)}% dari ${K.fmt(gpTot, 2)} km</span></div>
+        </div>
+        <div id="t-bencana"></div>
+        <div class="grafik"><canvas id="g-bencana"></canvas></div>
+      </div>`;
+    const kelas = (v, i, j) => (j >= 2 && j <= 9 && j % 2 === 1 && K.ada(v) ? (v >= 50 ? "bad" : v >= 25 ? "warn" : "") : "");
+    K.tabelHasil(document.getElementById("t-bencana"), {
+      kolom: ["Kelurahan", "Luas (ha)", ...BAHAYA.flatMap(([, n]) => [`${n} (ha)`, `${n} (%)`]), "Garis pantai (km)", "Terdampak (%)", "Laju abrasi (ha/thn)"],
+      baris: [
+        ...hasil.map((h) => [h.kel, h.L, ...h.ha.flatMap((v, i) => [v, h.persen[i]]), h.gp, h.gpPersen, h.laju]),
+        ["Kecamatan Ampenan", Ltot, ...haTot.flatMap((v) => [v, pct(v, Ltot)]), gpTot, pct(gptTot, gpTot), jumlah((h) => h.laju)],
+      ],
+      desimal: [0, 2, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
+      kelas,
+      namaFile: "keterpaparan-bencana",
+      catatan: "Persen terhadap luas kelurahan; ≥ 25% kuning, ≥ 50% merah. Luas tiap bahaya bisa saling tumpang tindih, jadi tidak dijumlahkan antar-bahaya.",
+    });
+    K.grafik("g-bencana", {
+      type: "bar",
+      data: { labels: hasil.map((h) => h.kel), datasets: BAHAYA.map(([, n], i) => ({ label: n, data: hasil.map((h) => (K.ada(h.persen[i]) ? h.persen[i] : null)), backgroundColor: ["#b8860b", "#1f78b4", "#0b8a8a", "#d7301f"][i] })) },
+      options: { scales: { y: { title: { display: true, text: "% luas kelurahan" }, beginAtZero: true } }, plugins: { legend: { position: "bottom" }, title: { display: true, text: "Persentase wilayah terpapar per jenis bahaya" } } },
+    });
+  },
+});
+</script>
+</body>
+</html>

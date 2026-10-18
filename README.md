@@ -59,7 +59,33 @@ Anggota tim tetap bisa mengubah kolom lain (misalnya `kondisi` dan `catatan_kond
 
 Tanggal ditulis `YYYY-MM-DD` atau `DD/MM/YYYY`.
 
-## 3. Menambah foto survei
+## 3. Mengisi kalkulator analisis
+
+Setiap kalkulator di folder `analisis/` membaca satu atau beberapa tab Sheets, menghitung dengan rumus di `assets/js/`, lalu menampilkan tabel hasil (bisa diunduh CSV) dan grafik. Angka juga bisa diubah langsung di halaman untuk mencoba saat diskusi, tetapi perubahan itu tidak tersimpan.
+
+Buat tab dengan nama persis seperti nama file di `data/sheets/` (impor file awalnya), publikasikan sebagai CSV, lalu tempel URL-nya di `data/config.json` seperti langkah 2. Daftar tab dan kalkulator yang memakainya:
+
+| Tab | Diisi bidang | Dipakai kalkulator |
+|---|---|---|
+| `kelurahan` | Administrasi | luas sudah terisi dari batas AOI; isi RT/RW dan luas lahan permukiman |
+| `parameter` | Koordinator | semua standar dan asumsi (SNI, template dosen) |
+| `penduduk_seri` | Sosbud & Kependudukan | proyeksi, kepadatan, kebutuhan rumah, sarana, prasarana, DDDTL |
+| `penduduk_struktur` | Sosbud & Kependudukan | struktur penduduk |
+| `standar_sarana`, `sarana_eksisting` | Sarana & Prasarana | sarana, sentralitas |
+| `rth` | Sarana & Prasarana | RTH 20% |
+| `ekonomi_sektor`, `ekonomi_meta` | Ekonomi & Permukiman | LQ, shift share |
+| `lahan`, `lahan_meta` | Fisik & Lingkungan | perubahan lahan |
+| `skl` | Fisik & Lingkungan | SKL |
+| `bencana` | Kebencanaan | keterpaparan bencana |
+| `cagar_budaya` | Sosbud & Kependudukan | kondisi cagar budaya |
+| `stakeholder`, `anggaran` | Administrasi & Kebijakan | stakeholder, efektivitas anggaran |
+| `ahp_responden`, `wlc_layer`, `zonasi_wlc` | Kebencanaan + Koordinator | AHP, WLC |
+| `mismatch` | Administrasi & Kebijakan + Fisik | konflik & mismatch |
+| `swot` | Koordinator | IFAS/EFAS & SWOT |
+
+Penulisan angka: pakai koma untuk desimal (`0,006`) atau titik tanpa pemisah ribuan (`0.006`). Titik diikuti tepat tiga angka, seperti `1.250`, dibaca sebagai seribu dua ratus lima puluh. Kolom judul (baris pertama) dan nama kelurahan jangan diubah.
+
+## 4. Menambah foto survei
 
 Cara otomatis:
 
@@ -78,11 +104,11 @@ Koordinat dibaca dari tag GPS EXIF atau dari deskripsi EXIF aplikasi TM3. Foto G
 
 Foto asli resolusi penuh tetap disimpan di Google Drive; repo hanya menyimpan versi 1600 px dan thumbnail 400 px.
 
-## 4. Struktur repo
+## 5. Struktur repo
 
 ```
 index.html, jadwal.html, tugas.html, kebutuhan-data.html, peta-survei.html
-analisis/                 halaman kalkulator
+analisis/                 21 halaman kalkulator
 assets/css, assets/js     tampilan dan skrip bersama
 data/config.json          URL Google Sheets, tanggal presentasi, kategori survei
 data/sheets/              salinan awal tiap tab Sheets (cadangan)

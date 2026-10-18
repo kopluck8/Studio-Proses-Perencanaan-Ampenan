@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Konflik Spasial &amp; Spatial Mismatch · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Konflik Spasial &amp; Spatial Mismatch</h1>
+    <p class="muted">Tahap 3 · PJ Bidang Administrasi-Kebijakan bersama Bidang Fisik. Isi luas hasil overlay QGIS per kelurahan dan jenis di tab <code>mismatch</code>.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li><b>Konflik spasial</b> = poligon Zonasi kelas 4–5 (tekanan pengembangan tinggi) yang beririsan dengan objek perlindungan: Kawasan Cagar Budaya, sempadan pantai &lt; 100 m, sempadan sungai 10–15 m.</li>
+      <li><b>Spatial mismatch</b> = guna lahan eksisting yang tidak sesuai zona Pola Ruang RDTR SWP I.A (Perwal Kota Mataram 19/2024), khususnya zona Cagar Budaya, sempadan, dan KP2B.</li>
+      <li><code>% kelurahan = luas (ha) / luas kelurahan × 100</code>; <code>% zona = luas (ha) / luas zona atau objek × 100</code>.</li>
+    </ul>
+    <p>Overlay dikerjakan di QGIS; kalkulator ini merekap luasnya. Jenis baru bisa ditambah di tab mismatch: awali nama jenis dengan "Konflik" atau "Mismatch" agar masuk kelompok yang benar. Sumber metode: proposal Tahap 3.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+K.halaman({
+  tabs: [
+    { nama: "mismatch", judul: "Luas konflik dan mismatch per kelurahan", kunci: ["kelurahan", "jenis"] },
+    { nama: "kelurahan", judul: "Luas kelurahan", kunci: ["kelurahan"] },
+  ],
+  hitung({ data, el }) {
+    const luas = {};
+    data.kelurahan.forEach((r) => { luas[r.kelurahan] = K.angka(r.luas_ha); });
+    const rows = data.mismatch.filter((r) => r.kelurahan && r.jenis);
+    const st = K.statusIsi(rows, ["luas_ha"]);
+    if (!st.isi) {
+      el.innerHTML = K.pesanKosong("Isi luas (ha) poligon hasil overlay QGIS di tab mismatch: konflik = Zonasi kelas 4–5 yang beririsan objek perlindungan; mismatch = guna lahan eksisting yang tidak sesuai zona RDTR SWP I.A.");
+      return;
+    }
+    const jenis = [...new Set(rows.map((r) => r.jenis))];
+    const konflik = (j) => /^konflik/i.test(j);
+    const kelList = K.urutKel([...new Set(rows.map((r) => r.kelurahan))].map((k) => ({ kelurahan: k }))).map((r) => r.kelurahan);
+    const nilai = (k, j) => { const r = rows.find((x) => x.kelurahan === k && x.jenis === j); return r ? K.angka(r.luas_ha) : NaN; };
+    const sum = (a) => { const v = a.filter(K.ada); return v.length ? v.reduce((s, x) => s + x, 0) : NaN; };
+    const pct = (a, b) => (K.ada(a) && K.ada(b) && b > 0 ? (a / b) * 100 : NaN);
+
+    const perKel = kelList.map((k) => {
+      const ha = jenis.map((j) => nilai(k, j));
+      const kf = sum(ha.filter((_, i) => konflik(jenis[i]))), mm = sum(ha.filter((_, i) => !konflik(jenis[i])));
+      return { k, ha, kf, mm, kfP: pct(kf, luas[k]), mmP: pct(mm, luas[k]), totP: pct(sum([kf, mm]), luas[k]) };
+    });
+    const urut = [...perKel].filter((p) => K.ada(p.totP)).sort((a, b) => b.totP - a.totP);
+    const peringkat = Object.fromEntries(urut.map((p, i) => [p.k, i + 1]));
+    const Ltot = sum(kelList.map((k) => luas[k]));
+    const kfTot = sum(perKel.map((p) => p.kf)), mmTot = sum(perKel.map((p) => p.mm));
+
+    const perJenis = jenis.map((j) => {
+      const ha = sum(kelList.map((k) => nilai(k, j)));
+      const zona = sum(rows.filter((r) => r.jenis === j).map((r) => K.angka(r.luas_zona_ha)));
+      return [j, ha, pct(ha, Ltot), zona, pct(ha, zona)];
+    });
+
+    el.innerHTML = `
+      <div class="card blok"><h2>Konflik dan mismatch per kelurahan</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Total konflik spasial</span><b>${K.fmt(kfTot, 2)} ha</b><span class="small muted">${K.fmt(pct(kfTot, Ltot), 2)}% kecamatan</span></div>
+          <div><span class="small muted">Total mismatch RDTR</span><b>${K.fmt(mmTot, 2)} ha</b><span class="small muted">${K.fmt(pct(mmTot, Ltot), 2)}% kecamatan</span></div>
+          <div><span class="small muted">Kelurahan paling kritis</span><b>${urut[0] ? Studio.esc(urut[0].k) : "–"}</b><span class="small muted">${urut[0] ? K.fmt(urut[0].totP, 1) + "% luas kelurahan" : ""}</span></div>
+        </div>
+        <div id="t-kel"></div>
+        <div class="grafik"><canvas id="g-km"></canvas></div>
+      </div>
+      <div class="card blok"><h2>Rekap per jenis</h2><div id="t-jenis"></div></div>`;
+
+    K.tabelHasil(document.getElementById("t-kel"), {
+      kolom: ["Peringkat", "Kelurahan", ...jenis.map((j) => `${j} (ha)`), "Konflik (ha)", "Konflik (%)", "Mismatch (ha)", "Mismatch (%)", "Total (% luas)"],
+      baris: [
+        ...[...perKel].sort((a, b) => (peringkat[a.k] || 99) - (peringkat[b.k] || 99)).map((p) => [peringkat[p.k] ? String(peringkat[p.k]) : "–", p.k, ...p.ha, p.kf, p.kfP, p.mm, p.mmP, p.totP]),
+        ["", "Kecamatan Ampenan", ...jenis.map((j) => sum(kelList.map((k) => nilai(k, j)))), kfTot, pct(kfTot, Ltot), mmTot, pct(mmTot, Ltot), pct(sum([kfTot, mmTot]), Ltot)],
+      ],
+      desimal: [0, 0, ...jenis.map(() => 2), 2, 2, 2, 2, 2],
+      kelas: (v, i, j) => (j === jenis.length + 6 && K.ada(v) && i < 3 && urut.length ? "bad" : ""),
+      namaFile: "konflik-mismatch-kelurahan",
+      catatan: "Peringkat berdasarkan total konflik + mismatch terhadap luas kelurahan; tiga teratas ditandai merah. Jumlah mengasumsikan poligon antar-jenis tidak tumpang tindih.",
+    });
+    K.tabelHasil(document.getElementById("t-jenis"), {
+      kolom: ["Jenis", "Luas (ha)", "% luas kecamatan", "Luas zona/objek (ha)", "% terhadap zona/objek"],
+      baris: perJenis,
+      desimal: [0, 2, 2, 2, 1],
+      namaFile: "konflik-mismatch-jenis",
+      catatan: "Isi kolom luas_zona_ha (luas zona RDTR atau objek perlindungan di kelurahan itu) untuk mendapat persen terhadap zona.",
+    });
+    const warna = ["#d7301f", "#1f78b4", "#0b8a8a", "#8e44ad", "#e6850e", "#33a02c", "#b8860b", "#6a5acd", "#7f8c8d"];
+    K.grafik("g-km", {
+      type: "bar",
+      data: { labels: perKel.map((p) => p.k), datasets: jenis.map((j, i) => ({ label: j, data: perKel.map((p) => (K.ada(p.ha[i]) ? p.ha[i] : null)), backgroundColor: warna[i % warna.length], stack: konflik(j) ? "konflik" : "mismatch" })) },
+      options: { scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: "ha" } } },
+        plugins: { legend: { position: "bottom" }, title: { display: true, text: "Luas konflik (batang kiri) dan mismatch (batang kanan) per kelurahan" } } },
+    });
+  },
+});
+</script>
+</body>
+</html>

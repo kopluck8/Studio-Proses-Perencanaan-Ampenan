@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kebutuhan Rumah dan Lahan Permukiman · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Kebutuhan Rumah dan Lahan Permukiman</h1>
+    <p class="muted">Aspek Demografi / Permukiman · PJ Bidang Ekonomi &amp; Permukiman. Memakai proyeksi penduduk dari tab <code>penduduk_seri</code> dan lahan permukiman eksisting dari tab <code>kelurahan</code> (kolom <code>lahan_permukiman_ha</code>, hasil digitasi Bidang Fisik).</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>Jumlah KK: <code>KK = P / jiwa per KK</code> (awal 4 jiwa/KK)</li>
+      <li>Unit rumah per tipe: <code>unit = KK × porsi</code>, komposisi kavling kecil : sedang : besar = 50% : 33% : 17%</li>
+      <li>Luas kavling: kecil (21+54)/2 = 37,5 m², sedang (70+100)/2 = 85 m², besar (120+200)/2 = 160 m²</li>
+      <li>Kebutuhan lahan (ha) = Σ (unit × luas kavling) / 10.000</li>
+      <li>Selisih = lahan permukiman eksisting − kebutuhan lahan (negatif berarti kekurangan lahan)</li>
+    </ul>
+    <p>Sumber: template Excel dosen (sheet "Proyeksi Kebutuhan Rumah"). Semua porsi dan luas kavling dapat diubah di tab <code>parameter</code>.</p>
+    <p class="small muted">Perbaikan dari template: kavling sedang dan besar di template dikalikan dengan <b>jumlah penduduk</b>, bukan jumlah KK (sel H5 dan I5), sehingga hasilnya sekitar empat kali terlalu besar. Di sini ketiga tipe dihitung dari jumlah KK.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+let tahunPilih = null;
+K.halaman({
+  tabs: [
+    { nama: "penduduk_seri", judul: "Jumlah penduduk per tahun", kunci: ["kelurahan"] },
+    { nama: "kelurahan", judul: "Luas dan lahan permukiman kelurahan", kunci: ["kelurahan"] },
+  ],
+  param: ["tahun_proyeksi", "metode_proyeksi", "laju_proyeksi", "jiwa_per_kk", "porsi_kavling_kecil", "porsi_kavling_sedang", "porsi_kavling_besar", "luas_kavling_kecil", "luas_kavling_sedang", "luas_kavling_besar"],
+  hitung({ data, p, el }) {
+    const pr = K.proyeksi(data.penduduk_seri, p);
+    const siap = pr.hasil.filter((h) => h.metode);
+    if (!siap.length) {
+      el.innerHTML = K.pesanKosong("Isi minimal dua tahun data penduduk di tab penduduk_seri.");
+      return;
+    }
+    const lahan = {};
+    data.kelurahan.forEach((r) => { lahan[r.kelurahan] = K.angka(r.lahan_permukiman_ha); });
+    const jkk = p.jiwa_per_kk ?? 4;
+    const tipe = [
+      ["kecil", (p.porsi_kavling_kecil ?? 50) / 100, p.luas_kavling_kecil ?? 37.5],
+      ["sedang", (p.porsi_kavling_sedang ?? 33) / 100, p.luas_kavling_sedang ?? 85],
+      ["besar", (p.porsi_kavling_besar ?? 17) / 100, p.luas_kavling_besar ?? 160],
+    ];
+    const totalPorsi = tipe.reduce((a, t) => a + t[1], 0);
+    const hitungP = (P) => {
+      const kk = P / jkk;
+      const unit = tipe.map(([, porsi]) => kk * porsi);
+      const ha = tipe.reduce((a, [, porsi, luas]) => a + kk * porsi * luas, 0) / 10000;
+      return { kk, unit, ha };
+    };
+    const tahunDasar = Math.max(...siap.map((h) => h.tahunDasar));
+    const tahunSemua = [tahunDasar, ...pr.target.filter((t) => t > tahunDasar)];
+    if (!tahunSemua.includes(tahunPilih)) tahunPilih = tahunSemua[tahunSemua.length - 1];
+    const nilaiP = (h, t) => (t === h.tahunDasar ? h.dasar : h.nilai[t]);
+
+    el.innerHTML = `
+      ${Math.abs(totalPorsi - 1) > 0.001 ? `<div class="notice small">Jumlah porsi kavling ${K.fmt(totalPorsi * 100, 1)}%, bukan 100%. Periksa tab parameter.</div>` : ""}
+      <div class="card blok"><h2>Kebutuhan lahan permukiman per tahun (ha)</h2><div id="t-tahun"></div>
+        <div class="grafik"><canvas id="g-rumah"></canvas></div></div>
+      <div class="card blok"><h2>Rincian kebutuhan rumah</h2>
+        <div class="filters"><label class="small">Tahun <select id="pilih-tahun">${tahunSemua.map((t) => `<option${t === tahunPilih ? " selected" : ""}>${t}</option>`).join("")}</select></label></div>
+        <div id="t-rinci"></div></div>`;
+
+    const barisT = siap.map((h) => [h.kelurahan, lahan[h.kelurahan], ...tahunSemua.map((t) => hitungP(nilaiP(h, t)).ha)]);
+    const jum = (j) => barisT.reduce((a, r) => a + (K.ada(r[j]) ? r[j] : 0), 0);
+    barisT.push(["Kecamatan Ampenan", jum(1) || NaN, ...tahunSemua.map((_, i) => jum(i + 2))]);
+    K.tabelHasil(document.getElementById("t-tahun"), {
+      kolom: ["Kelurahan", "Lahan permukiman eksisting (ha)", ...tahunSemua.map((t) => (t === tahunDasar ? `${t} (eksisting)` : String(t)))],
+      baris: barisT, desimal: [0, 2, ...tahunSemua.map(() => 2)], namaFile: "kebutuhan-lahan-permukiman",
+      kelas: (v, i, j) => (j >= 2 && K.ada(barisT[i][1]) && v > barisT[i][1] ? "bad" : ""),
+      catatan: "Angka merah: kebutuhan lahan melebihi lahan permukiman eksisting.",
+    });
+
+    const rinci = () => {
+      const t = tahunPilih;
+      const b = siap.map((h) => {
+        const P = nilaiP(h, t), r = hitungP(P), L = lahan[h.kelurahan];
+        return [h.kelurahan, P, r.kk, ...r.unit, r.unit.reduce((a, x) => a + x, 0), r.ha, L, L - r.ha];
+      });
+      const s = (j) => b.reduce((a, r) => a + (K.ada(r[j]) ? r[j] : 0), 0);
+      const sL = b.some((r) => K.ada(r[8])) ? s(8) : NaN;
+      b.push(["Kecamatan Ampenan", s(1), s(2), s(3), s(4), s(5), s(6), s(7), sL, K.ada(sL) ? sL - s(7) : NaN]);
+      K.tabelHasil(document.getElementById("t-rinci"), {
+        kolom: ["Kelurahan", `Penduduk ${t}`, "KK", "Unit kecil", "Unit sedang", "Unit besar", "Total unit", "Kebutuhan lahan (ha)", "Lahan eksisting (ha)", "Selisih (ha)"],
+        baris: b, desimal: [0, 0, 0, 0, 0, 0, 0, 2, 2, 2], namaFile: `kebutuhan-rumah-${t}`,
+        kelas: (v, i, j) => (j === 9 && K.ada(v) ? (v < 0 ? "bad" : "ok") : ""),
+        catatan: "Selisih negatif = lahan permukiman eksisting tidak cukup. Kosong bila lahan_permukiman_ha belum diisi.",
+      });
+    };
+    document.getElementById("pilih-tahun").onchange = (e) => { tahunPilih = Number(e.target.value); rinci(); };
+    rinci();
+
+    K.grafik("g-rumah", {
+      type: "bar",
+      data: { labels: siap.map((h) => h.kelurahan), datasets: [
+        ...tahunSemua.map((t, i) => ({ label: String(t), data: siap.map((h) => hitungP(nilaiP(h, t)).ha), backgroundColor: K.WARNA[i % 10] })),
+        ...(siap.some((h) => K.ada(lahan[h.kelurahan])) ? [{ type: "line", label: "Lahan eksisting", data: siap.map((h) => lahan[h.kelurahan] ?? null), borderColor: "#333", backgroundColor: "#333", showLine: false, pointStyle: "line", pointRadius: 14, pointBorderWidth: 3 }] : []),
+      ] },
+      options: { plugins: { legend: { position: "bottom" }, title: { display: true, text: "Kebutuhan lahan permukiman (ha)" } } },
+    });
+  },
+});
+</script>
+</body>
+</html>

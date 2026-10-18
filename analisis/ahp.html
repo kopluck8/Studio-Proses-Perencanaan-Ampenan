@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AHP · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>AHP: Bobot Kriteria dan Uji Konsistensi</h1>
+    <p class="muted">Tahap 2 · Spatial-MCDA · PJ Bidang Kebencanaan bersama Koordinator. Isi jawaban kuesioner perbandingan berpasangan di tab <code>ahp_responden</code>: satu baris per pasangan per responden. Kolom <b>nilai</b> = seberapa penting <b>kriteria_a</b> dibanding <b>kriteria_b</b> (skala Saaty 1–9; bila kriteria_b yang lebih penting tulis pecahan, misalnya <code>1/3</code>). Cukup isi segitiga atas; kebalikannya dihitung otomatis.</p>
+    <p class="muted small">Level 1 sudah berisi 15 pasangan dari 6 aspek kewilayahan di proposal untuk responden R1. Untuk responden berikutnya, salin 15 baris itu dan ganti nama responden. Sub-kriteria (Level 2) ditambahkan dengan <code>level</code> = 2 dan <code>induk</code> = nama aspek Level 1.</p>
+  </div>
+  <label class="small" style="display:block;margin-bottom:.75rem"><input type="checkbox" id="hanya-konsisten"> Gabungkan hanya responden yang konsisten (CR &lt; batas)</label>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>Matriks perbandingan berpasangan A berukuran n×n, a<sub>ji</sub> = 1/a<sub>ij</sub>, a<sub>ii</sub> = 1.</li>
+      <li>Bobot (pendekatan eigenvector): normalisasi tiap kolom (a<sub>ij</sub> / Σ<sub>i</sub> a<sub>ij</sub>), lalu rata-rata tiap baris → w<sub>i</sub>, Σ w<sub>i</sub> = 1.</li>
+      <li><code>λmax = rata-rata((A·w)ᵢ / wᵢ)</code>, <code>CI = (λmax − n)/(n − 1)</code>, <code>CR = CI / RI</code>. Konsisten bila CR &lt; 0,10.</li>
+      <li>RI Saaty: n=3 0,58 · 4 0,90 · 5 1,12 · 6 1,24 · 7 1,32 · 8 1,41 · 9 1,45 · 10 1,49.</li>
+      <li>Penggabungan responden: rata-rata geometrik <code>aᵢⱼ(gabungan) = (Π aᵢⱼ⁽ᵏ⁾)^(1/m)</code>, lalu bobot dan CR dihitung ulang dari matriks gabungan.</li>
+      <li>Bobot global sub-kriteria = bobot kriteria Level 1 × bobot lokal sub-kriteria.</li>
+    </ul>
+    <p class="small muted">Sumber: proposal Bab 2.2.2 dan 3.2.3 (Saaty, 1980; Malczewski, 1999). Pertanyaan fokus: "Dalam mengukur Tingkat Kerentanan Wilayah dan Risiko Ketidaksesuaian Pemanfaatan Lahan di Kecamatan Ampenan, kriteria manakah yang memberikan kontribusi pertimbangan/pembatas lebih dominan?" Bobot hasil halaman ini dipakai di <a href="wlc.html">Generator WLC</a>.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script src="../assets/js/ahp.js"></script>
+<script>
+let jalankanUlang = null;
+document.getElementById("hanya-konsisten").addEventListener("change", () => jalankanUlang && jalankanUlang());
+
+K.halaman({
+  tabs: [{ nama: "ahp_responden", judul: "Jawaban kuesioner berpasangan", teks: ["responden", "instansi", "level", "induk", "kriteria_a", "kriteria_b", "nilai"], tambahBaris: true }],
+  param: ["ahp_cr_maks"],
+  hitung(ctx) {
+    jalankanUlang = () => this.hitung(ctx);
+    const { data, p, el } = ctx;
+    const crMaks = K.ada(Number(p.ahp_cr_maks)) ? Number(p.ahp_cr_maks) : 0.1;
+    const hanyaKonsisten = document.getElementById("hanya-konsisten").checked;
+    const h = AHP.analisis(data.ahp_responden, { crMaks, hanyaKonsisten });
+    const pill = (ok) => ok ? '<span class="pill ok">Konsisten</span>' : '<span class="pill bad">Tidak konsisten</span>';
+    const lengkapSatu = h.grup.some((g) => g.responden.some((r) => r.M));
+    if (!lengkapSatu) {
+      el.innerHTML = K.pesanKosong("Belum ada responden yang mengisi semua pasangan dalam satu kelompok kriteria. Isi kolom nilai untuk semua pasangan responden tersebut.");
+      return;
+    }
+    const nama = (g) => g.level === "1" ? "Level 1 · Kriteria utama" : `Level ${g.level} · Sub-kriteria ${g.induk}`;
+    el.innerHTML = `
+      ${h.l1 && h.l1.gabungan ? `<div class="card blok"><h2>Bobot kriteria utama (gabungan)</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Responden dipakai</span><b>${h.l1.dipakai} / ${h.l1.responden.length}</b></div>
+          <div><span class="small muted">CR gabungan</span><b>${K.fmt(h.l1.gabungan.CR, 3)}</b></div>
+          <div><span class="small muted">Status</span><b>${pill(h.l1.konsisten)}</b></div>
+        </div>
+        <div class="grafik"><canvas id="g-bobot"></canvas></div></div>` : ""}
+      ${h.grup.map((g, gi) => `<div class="card blok"><h2>${S_esc(nama(g))}</h2>
+        <h3>Konsistensi per responden</h3><div id="t-resp-${gi}"></div>
+        ${g.gabungan ? `<h3 style="margin-top:1rem">Bobot gabungan (rata-rata geometrik ${g.dipakai} responden)</h3><div id="t-bobot-${gi}"></div>` : '<p class="muted small">Belum ada responden lengkap untuk kelompok ini' + (hanyaKonsisten ? " yang konsisten" : "") + ".</p>"}
+      </div>`).join("")}
+      ${h.global.some((x) => x.sub) ? `<div class="card blok"><h2>Bobot global sub-kriteria</h2><div id="t-global"></div></div>` : ""}`;
+
+    h.grup.forEach((g, gi) => {
+      K.tabelHasil(document.getElementById(`t-resp-${gi}`), {
+        kolom: ["Responden", "Instansi", "Pasangan terisi", "λmax", "CI", "CR", "Status"],
+        baris: g.responden.map((r) => [r.nama, r.instansi, `${r.terisi} / ${r.perlu}`,
+          r.hasil ? r.hasil.lambda : NaN, r.hasil ? r.hasil.CI : NaN, r.hasil ? r.hasil.CR : NaN,
+          r.hasil ? (r.konsisten ? "Konsisten" : "Tidak konsisten") : "Belum lengkap"]),
+        desimal: [0, 0, 0, 4, 4, 4, 0],
+        kelas: (v, i, j) => j === 6 ? (v === "Konsisten" ? "ok" : v === "Tidak konsisten" ? "bad" : "warn") : "",
+        namaFile: `ahp-konsistensi-level${g.level}${g.induk ? "-" + g.induk : ""}`,
+        catatan: `n = ${g.item.length} kriteria, RI = ${K.fmt(AHP.RI[g.item.length] ?? NaN, 2)}, batas CR = ${K.fmt(crMaks, 2)}.`,
+      });
+      if (!g.gabungan) return;
+      const urut = g.item.map((k, i) => ({ k, w: g.gabungan.w[i] })).sort((a, b) => b.w - a.w);
+      K.tabelHasil(document.getElementById(`t-bobot-${gi}`), {
+        kolom: ["Peringkat", "Kriteria", "Bobot", "Bobot (%)"],
+        baris: [...urut.map((x, i) => [String(i + 1), x.k, x.w, x.w * 100]),
+          ["", "Jumlah", urut.reduce((a, x) => a + x.w, 0), 100]],
+        desimal: [0, 0, 4, 2],
+        namaFile: `ahp-bobot-level${g.level}${g.induk ? "-" + g.induk : ""}`,
+        catatan: `λmax = ${K.fmt(g.gabungan.lambda, 4)} · CI = ${K.fmt(g.gabungan.CI, 4)} · CR = ${K.fmt(g.gabungan.CR, 4)} · ${g.konsisten ? "konsisten" : "TIDAK konsisten, tinjau ulang jawaban"}`,
+      });
+    });
+
+    if (h.global.some((x) => x.sub)) {
+      K.tabelHasil(document.getElementById("t-global"), {
+        kolom: ["Kriteria", "Bobot kriteria", "Sub-kriteria", "Bobot lokal", "Bobot global"],
+        baris: h.global.map((x) => [x.kriteria, x.w1, x.sub || "(tanpa sub-kriteria)", x.lokal, x.global]),
+        desimal: [0, 4, 0, 4, 4],
+        namaFile: "ahp-bobot-global",
+        catatan: `Jumlah bobot global = ${K.fmt(h.global.reduce((a, x) => a + x.global, 0), 4)}`,
+      });
+    }
+
+    if (h.l1 && h.l1.gabungan) {
+      K.grafik("g-bobot", {
+        type: "bar",
+        data: { labels: h.l1.item, datasets: [{ label: "Bobot", data: h.l1.gabungan.w.map((w) => +(w * 100).toFixed(2)), backgroundColor: K.WARNA[0] }] },
+        options: { indexAxis: "y", plugins: { legend: { display: false }, title: { display: true, text: "Bobot kriteria Level 1 (%)" } }, scales: { x: { beginAtZero: true } } },
+      });
+    }
+  },
+});
+function S_esc(s) { return Studio.esc(s); }
+</script>
+</body>
+</html>

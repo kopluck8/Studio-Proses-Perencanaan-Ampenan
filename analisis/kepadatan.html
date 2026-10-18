@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kepadatan Penduduk · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Kepadatan Penduduk</h1>
+    <p class="muted">Aspek Demografi · PJ Bidang Sosial, Budaya &amp; Kependudukan. Memakai jumlah penduduk dari tab <code>penduduk_seri</code> (beserta proyeksinya) dan luas kelurahan dari tab <code>kelurahan</code>.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <p><code>Kepadatan = P / luas wilayah</code> (jiwa/ha), dihitung untuk tahun data terakhir dan setiap tahun proyeksi. Proyeksi penduduk diambil dari kalkulator <a href="proyeksi-penduduk.html">Proyeksi Penduduk</a> dengan parameter yang sama.</p>
+    <p>Klasifikasi SNI 03-1733-2004: rendah ≤ 150, sedang 151–200, tinggi 201–400, sangat padat &gt; 400 jiwa/ha (batas dapat diubah di tab <code>parameter</code>).</p>
+    <p>Luas kelurahan awal dihitung dari batas AOI resmi (BIG, 2022; total ±925 ha), bukan dari Tabel 1 proposal.</p>
+    <p class="small muted">Perbaikan dari template: sel luas wilayah di sheet "Kepadatan Penduduk" berisi <code>#REF!</code>; di sini luas dibaca dari tab <code>kelurahan</code>.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+function kelas(d, p) {
+  if (!K.ada(d)) return ["–", ""];
+  const r = p.kepadatan_rendah_maks ?? 150, s = p.kepadatan_sedang_maks ?? 200, t = p.kepadatan_tinggi_maks ?? 400;
+  if (d <= r) return ["Rendah", "ok"];
+  if (d <= s) return ["Sedang", ""];
+  if (d <= t) return ["Tinggi", "warn"];
+  return ["Sangat padat", "bad"];
+}
+K.halaman({
+  tabs: [
+    { nama: "penduduk_seri", judul: "Jumlah penduduk per tahun", kunci: ["kelurahan"] },
+    { nama: "kelurahan", judul: "Luas kelurahan", kunci: ["kelurahan"] },
+  ],
+  param: ["tahun_proyeksi", "metode_proyeksi", "laju_proyeksi", "kepadatan_rendah_maks", "kepadatan_sedang_maks", "kepadatan_tinggi_maks"],
+  hitung({ data, p, el }) {
+    const pr = K.proyeksi(data.penduduk_seri, p);
+    const luas = {};
+    data.kelurahan.forEach((r) => { luas[r.kelurahan] = K.angka(r.luas_ha); });
+    const siap = pr.hasil.filter((h) => h.metode);
+    if (!siap.length) {
+      el.innerHTML = K.pesanKosong("Isi minimal dua tahun data penduduk di tab penduduk_seri. Luas kelurahan sudah terisi dari batas AOI.");
+      return;
+    }
+    const tahunDasar = Math.max(...siap.map((h) => h.tahunDasar));
+    const target = pr.target.filter((t) => t > tahunDasar);
+    const totalLuas = pr.hasil.reduce((a, h) => a + (K.ada(luas[h.kelurahan]) ? luas[h.kelurahan] : 0), 0);
+    const tot = (f) => siap.reduce((a, h) => a + (K.ada(f(h)) ? f(h) : 0), 0);
+    const baris = pr.hasil.map((h) => {
+      const L = luas[h.kelurahan];
+      const dDasar = h.dasar / L;
+      return [h.kelurahan, L, h.tahunDasar ? String(h.tahunDasar) : "–", h.dasar, dDasar, kelas(dDasar, p)[0],
+        ...target.map((t) => (h.nilai[t] ?? NaN) / L), kelas((h.nilai[target[target.length - 1]] ?? NaN) / L, p)[0]];
+    });
+    const totDasar = tot((h) => h.dasar);
+    const totAkhir = (t) => tot((h) => h.nilai[t]);
+    const dKec = totDasar / totalLuas;
+    baris.push(["Kecamatan Ampenan", totalLuas, String(tahunDasar), totDasar, dKec, kelas(dKec, p)[0],
+      ...target.map((t) => totAkhir(t) / totalLuas), kelas(totAkhir(target[target.length - 1]) / totalLuas, p)[0]]);
+    const akhir = target[target.length - 1];
+    el.innerHTML = `
+      <div class="card blok"><h2>Hasil kepadatan</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Kepadatan kecamatan ${tahunDasar}</span><b>${K.fmt(dKec, 1)} jiwa/ha</b></div>
+          ${akhir ? `<div><span class="small muted">Kepadatan kecamatan ${akhir}</span><b>${K.fmt(totAkhir(akhir) / totalLuas, 1)} jiwa/ha</b></div>` : ""}
+          <div><span class="small muted">Luas wilayah</span><b>${K.fmt(totalLuas, 2)} ha</b></div>
+        </div>
+        <div id="t-hasil"></div>
+        <div class="grafik"><canvas id="g-kepadatan"></canvas></div>
+      </div>`;
+    const kelasKol = (v, i, j) => (j === 5 || j === 6 + target.length) ? ({ Rendah: "ok", Tinggi: "warn", "Sangat padat": "bad" }[v] || "") : "";
+    K.tabelHasil(document.getElementById("t-hasil"), {
+      kolom: ["Kelurahan", "Luas (ha)", "Tahun dasar", "Penduduk", `Kepadatan ${tahunDasar} (jiwa/ha)`, `Kelas ${tahunDasar}`,
+        ...target.map((t) => `Kepadatan ${t}`), akhir ? `Kelas ${akhir}` : "Kelas akhir"],
+      baris, desimal: [0, 2, 0, 0, 1, 0, ...target.map(() => 1), 0], kelas: kelasKol, namaFile: "kepadatan-penduduk",
+      catatan: `Klasifikasi SNI 03-1733-2004: rendah ≤ ${p.kepadatan_rendah_maks ?? 150}, sedang ≤ ${p.kepadatan_sedang_maks ?? 200}, tinggi ≤ ${p.kepadatan_tinggi_maks ?? 400}, di atasnya sangat padat (jiwa/ha).`,
+    });
+    const hasilKel = pr.hasil.filter((h) => h.metode);
+    const garis = (nilai, label) => ({ type: "line", label, data: hasilKel.map(() => nilai), borderColor: "#999", borderDash: [4, 4], borderWidth: 1, pointRadius: 0 });
+    K.grafik("g-kepadatan", {
+      type: "bar",
+      data: { labels: hasilKel.map((h) => h.kelurahan), datasets: [
+        { label: `${tahunDasar}`, data: hasilKel.map((h) => h.dasar / luas[h.kelurahan]), backgroundColor: K.WARNA[0] },
+        ...(akhir ? [{ label: `${akhir} (proyeksi)`, data: hasilKel.map((h) => h.nilai[akhir] / luas[h.kelurahan]), backgroundColor: K.WARNA[3] }] : []),
+        garis(p.kepadatan_rendah_maks ?? 150, "Batas rendah"), garis(p.kepadatan_tinggi_maks ?? 400, "Batas tinggi"),
+      ] },
+      options: { plugins: { legend: { position: "bottom" }, title: { display: true, text: "Kepadatan penduduk per kelurahan (jiwa/ha)" } } },
+    });
+  },
+});
+</script>
+</body>
+</html>

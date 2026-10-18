@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Efektivitas Anggaran · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Efektivitas Anggaran</h1>
+    <p class="muted">Aspek Pembiayaan &amp; Kelembagaan · PJ Bidang Administrasi, Kebijakan &amp; Profil Wilayah. Isi anggaran dan realisasi program penataan ruang, pelestarian cagar budaya, dan mitigasi bencana (APBD/DAK/LKPJ Kota Mataram) di tab <code>anggaran</code>, satu baris per program per tahun. Nilai dalam rupiah.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <p><code>Efektivitas = realisasi / anggaran × 100%</code></p>
+    <table>
+      <thead><tr><th>Efektivitas</th><th>Kriteria</th></tr></thead>
+      <tbody>
+        <tr><td>&gt; 100%</td><td>Sangat efektif</td></tr>
+        <tr><td>90–100%</td><td>Efektif</td></tr>
+        <tr><td>80–90%</td><td>Cukup efektif</td></tr>
+        <tr><td>60–80%</td><td>Kurang efektif</td></tr>
+        <tr><td>&lt; 60%</td><td>Tidak efektif</td></tr>
+      </tbody>
+    </table>
+    <p>Sumber kriteria: Kepmendagri No. 690.900.327 Tahun 1996. Sumber data: APBD dan LKPJ Kota Mataram, DPA perangkat daerah terkait (proposal Bab 3.3.2, aspek pembiayaan).</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+const KRITERIA = [
+  [100.0000001, "Sangat efektif", "ok"], [90, "Efektif", "ok"], [80, "Cukup efektif", "warn"], [60, "Kurang efektif", "warn"], [-Infinity, "Tidak efektif", "bad"],
+];
+const kriteria = (e) => (K.ada(e) ? KRITERIA.find(([b]) => e >= b) : null);
+const singkat = (s, n = 40) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+
+K.halaman({
+  tabs: [{ nama: "anggaran", judul: "Anggaran dan realisasi per program", teks: ["program", "sumber_dana", "tahun"], tambahBaris: true }],
+  hitung({ data, el }) {
+    const esc = Studio.esc;
+    const baris = data.anggaran.map((r) => ({ program: String(r.program || "").trim(), sumber: String(r.sumber_dana || "").trim() || "(tanpa keterangan)",
+      tahun: String(r.tahun || "").trim() || "–", a: K.angka(r.anggaran), r: K.angka(r.realisasi) }))
+      .filter((b) => K.ada(b.a) && b.a > 0 && K.ada(b.r));
+    if (!baris.length) {
+      el.innerHTML = K.pesanKosong("Isi minimal satu program dengan nilai anggaran dan realisasi di tab anggaran.");
+      return;
+    }
+    baris.forEach((b) => { b.e = (b.r / b.a) * 100; b.k = kriteria(b.e); });
+    const A = baris.reduce((s, b) => s + b.a, 0), R = baris.reduce((s, b) => s + b.r, 0), E = (R / A) * 100;
+    const rekap = (kunci) => {
+      const g = {};
+      baris.forEach((b) => { const x = (g[b[kunci]] = g[b[kunci]] || { a: 0, r: 0, n: 0 }); x.a += b.a; x.r += b.r; x.n++; });
+      return Object.entries(g).sort((x, y) => x[0].localeCompare(y[0], "id")).map(([k, v]) => { const e = (v.r / v.a) * 100; return [k, v.n, v.a, v.r, e, kriteria(e)[1]]; });
+    };
+    const kls = (v) => (KRITERIA.find(([, n]) => n === v) || [])[2] || "";
+    el.innerHTML = `
+      <div class="card blok"><h2>Efektivitas per program</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Total anggaran</span><b>Rp ${K.fmt(A)}</b></div>
+          <div><span class="small muted">Total realisasi</span><b>Rp ${K.fmt(R)}</b></div>
+          <div><span class="small muted">Efektivitas keseluruhan</span><b>${K.fmt(E, 2)}% · ${esc(kriteria(E)[1])}</b></div>
+          <div><span class="small muted">Program di bawah 80%</span><b>${baris.filter((b) => b.e < 80).length} dari ${baris.length}</b></div>
+        </div>
+        <div id="t-prog"></div>
+        <div class="grafik" style="height:${Math.max(280, baris.length * 30 + 80)}px"><canvas id="g-ag"></canvas></div>
+      </div>
+      <div class="card blok"><h2>Rekap per tahun</h2><div id="t-tahun"></div></div>
+      <div class="card blok"><h2>Rekap per sumber dana</h2><div id="t-sumber"></div></div>`;
+    const urut = [...baris].sort((x, y) => x.e - y.e);
+    K.tabelHasil(document.getElementById("t-prog"), {
+      kolom: ["Program", "Sumber dana", "Tahun", "Anggaran (Rp)", "Realisasi (Rp)", "Efektivitas (%)", "Kriteria"],
+      baris: urut.map((b) => [b.program || "(tanpa nama)", b.sumber, b.tahun, b.a, b.r, b.e, b.k[1]]),
+      desimal: [0, 0, 0, 0, 0, 2, 0],
+      kelas: (v, i, j) => (j === 6 ? kls(v) : ""),
+      namaFile: "efektivitas-anggaran",
+      catatan: "Diurutkan dari efektivitas terendah.",
+    });
+    const kolomRekap = (lbl) => [lbl, "Jumlah program", "Anggaran (Rp)", "Realisasi (Rp)", "Efektivitas (%)", "Kriteria"];
+    K.tabelHasil(document.getElementById("t-tahun"), { kolom: kolomRekap("Tahun"), baris: rekap("tahun"), desimal: [0, 0, 0, 0, 2, 0], kelas: (v, i, j) => (j === 5 ? kls(v) : ""), namaFile: "efektivitas-per-tahun" });
+    K.tabelHasil(document.getElementById("t-sumber"), { kolom: kolomRekap("Sumber dana"), baris: rekap("sumber"), desimal: [0, 0, 0, 0, 2, 0], kelas: (v, i, j) => (j === 5 ? kls(v) : ""), namaFile: "efektivitas-per-sumber" });
+    const WARNA_K = { ok: "#2f7d3a", warn: "#e6850e", bad: "#b23b2e" };
+    // Garis acuan 60, 80, 90, 100%.
+    const acuan = { id: "acuan", afterDatasetsDraw(c) {
+      const g = c.ctx, { top, bottom } = c.chartArea; g.save(); g.setLineDash([4, 4]); g.strokeStyle = "#7f8c8d";
+      g.font = "10px " + Chart.defaults.font.family; g.fillStyle = Chart.defaults.color; g.textAlign = "center";
+      [60, 80, 90, 100].forEach((v) => { const x = c.scales.x.getPixelForValue(v); g.beginPath(); g.moveTo(x, top); g.lineTo(x, bottom); g.stroke(); g.fillText(v + "%", x, top - 3); });
+      g.restore();
+    } };
+    K.grafik("g-ag", {
+      type: "bar",
+      data: { labels: urut.map((b) => singkat(`${b.program || "(tanpa nama)"} ${b.tahun !== "–" ? "(" + b.tahun + ")" : ""}`.trim())),
+        datasets: [{ label: "Efektivitas (%)", data: urut.map((b) => b.e), backgroundColor: urut.map((b) => WARNA_K[b.k[2]]) }] },
+      options: { indexAxis: "y", layout: { padding: { top: 12 } },
+        scales: { x: { beginAtZero: true, suggestedMax: 110, title: { display: true, text: "Efektivitas (%)" } } },
+        plugins: { legend: { display: false }, title: { display: true, text: "Efektivitas per program (garis acuan 60, 80, 90, 100%)", padding: { bottom: 16 } } } },
+      plugins: [acuan],
+    });
+  },
+});
+</script>
+</body>
+</html>

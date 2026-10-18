@@ -1,0 +1,23 @@
+jenis,kelompok,penduduk_pendukung,luas_lahan_ha_per_unit,luas_m2_per_jiwa
+TK,Pendidikan,1250,0.05,
+SD,Pendidikan,1600,0.2,
+SMP,Pendidikan,4800,,
+SMA,Pendidikan,4800,,
+Musala,Peribadatan,250,0.0045,
+Masjid,Peribadatan,2500,0.03,
+Gereja,Peribadatan,2500,0.03,
+Posyandu,Kesehatan,1000,0.006,
+Praktik dokter/klinik,Kesehatan,5000,0.006,
+Apotek,Kesehatan,10000,0.006,
+Puskesmas,Kesehatan,30000,0.03,
+Rumah sakit,Kesehatan,120000,0.1,
+Balai pertemuan,Pemerintahan & pelayanan umum,2500,0.03,
+Pos hansip,Pemerintahan & pelayanan umum,2500,0.0012,
+Parkir umum,Pemerintahan & pelayanan umum,2500,0.01,
+Rumah makan,Perdagangan,250,,
+Pertokoan,Perdagangan,6000,,
+Pasar lingkungan,Perdagangan,30000,,
+Pusat perbelanjaan,Perdagangan,120000,,
+Taman RT,RTH,250,,1
+Taman RW,RTH,2500,,0.5
+Taman kelurahan,RTH,30000,,0.3

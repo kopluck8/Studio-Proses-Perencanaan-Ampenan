@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indeks Sentralitas · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Indeks Sentralitas Antar-Kelurahan</h1>
+    <p class="muted">Aspek Sarana &amp; Prasarana · PJ Bidang Sarana &amp; Prasarana. Memakai jumlah unit sarana eksisting per kelurahan dari tab <code>sarana_eksisting</code> (sama dengan kalkulator Kebutuhan Sarana). Kolom fasilitas bisa ditambah di tab tersebut.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>Bobot fasilitas <code>C = t / T</code>, dengan t = nilai sentralitas total (parameter <code>sentralitas_bobot_total</code>, bawaan 100) dan T = jumlah unit fasilitas itu di seluruh kecamatan.</li>
+      <li>Indeks kelurahan = <code>Σ (jumlah unit fasilitas × C)</code>.</li>
+      <li>Orde pusat pelayanan dibagi dengan interval sama dari indeks terendah sampai tertinggi: lebar kelas = (maks − min) / jumlah orde. Orde I = indeks tertinggi.</li>
+    </ul>
+    <p>Sumber: metode indeks sentralitas Marshall, seperti template Excel dosen (indeks sentralitas Kab. Landak), dihitung antar 10 kelurahan Ampenan.</p>
+    <p class="small muted">Perbaikan dari template: fasilitas yang jumlahnya nol di seluruh wilayah (T = 0) menghasilkan <code>#DIV/0!</code> di template; di sini fasilitas itu diabaikan. Pembagian orde di template ditentukan manual dan tidak konsisten dengan nilai indeks; di sini orde dihitung otomatis dengan interval sama.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+const ROMAWI = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+K.halaman({
+  tabs: [{ nama: "sarana_eksisting", judul: "Jumlah unit sarana eksisting per kelurahan", kunci: ["kelurahan"] }],
+  param: ["sentralitas_bobot_total", "sentralitas_jumlah_orde"],
+  hitung({ data, p, el }) {
+    const rows = K.urutKel(data.sarana_eksisting);
+    const fasilitas = (data.sarana_eksisting.fields || []).filter((f) => f !== "kelurahan");
+    const t = typeof p.sentralitas_bobot_total === "number" ? p.sentralitas_bobot_total : 100;
+    const nOrde = Math.max(1, Math.min(10, Math.round(typeof p.sentralitas_jumlah_orde === "number" ? p.sentralitas_jumlah_orde : 3)));
+    const n = (r, f) => { const v = K.angka(r[f]); return K.ada(v) ? v : 0; };
+    const bobot = fasilitas.map((f) => { const T = rows.reduce((a, r) => a + n(r, f), 0); return { f, T, C: T > 0 ? t / T : NaN }; });
+    const dipakai = bobot.filter((b) => b.T > 0);
+    if (!dipakai.length) {
+      el.innerHTML = K.pesanKosong("Isi jumlah unit sarana per kelurahan di tab sarana_eksisting. Indeks dihitung dari fasilitas yang ada minimal di satu kelurahan.");
+      return;
+    }
+    const skor = rows.map((r) => ({
+      kel: r.kelurahan,
+      jenis: dipakai.filter((b) => n(r, b.f) > 0).length,
+      unit: dipakai.reduce((a, b) => a + n(r, b.f), 0),
+      indeks: dipakai.reduce((a, b) => a + n(r, b.f) * b.C, 0),
+    }));
+    const min = Math.min(...skor.map((s) => s.indeks)), max = Math.max(...skor.map((s) => s.indeks));
+    const lebar = (max - min) / nOrde;
+    const orde = (v) => (lebar > 0 ? Math.min(nOrde, Math.floor((max - v) / lebar) + 1) : 1);
+    const urut = [...skor].sort((a, b) => b.indeks - a.indeks);
+    skor.forEach((s) => { s.orde = orde(s.indeks); s.peringkat = urut.indexOf(s) + 1; });
+    const kelas = Array.from({ length: nOrde }, (_, i) => [`Orde ${ROMAWI[i]}`, max - (i + 1) * lebar, max - i * lebar]);
+
+    el.innerHTML = `
+      <div class="card blok"><h2>Indeks sentralitas dan orde pusat pelayanan</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Fasilitas dihitung</span><b>${dipakai.length} / ${fasilitas.length}</b></div>
+          <div><span class="small muted">Pusat orde I</span><b>${Studio.esc(skor.filter((s) => s.orde === 1).map((s) => s.kel).join(", "))}</b></div>
+          <div><span class="small muted">Lebar kelas</span><b>${K.fmt(lebar, 2)}</b></div>
+        </div>
+        <div id="t-indeks"></div>
+        <div class="grafik"><canvas id="g-indeks"></canvas></div>
+      </div>
+      <div class="card blok"><h2>Batas kelas orde</h2><div id="t-kelas"></div></div>
+      <div class="card blok"><h2>Bobot tiap fasilitas</h2><div id="t-bobot"></div></div>`;
+
+    K.tabelHasil(document.getElementById("t-indeks"), {
+      kolom: ["Kelurahan", "Jenis fasilitas", "Jumlah unit", "Indeks sentralitas", "Orde", "Peringkat"],
+      baris: skor.map((s) => [s.kel, s.jenis, s.unit, s.indeks, `Orde ${ROMAWI[s.orde - 1]}`, s.peringkat]),
+      desimal: [0, 0, 0, 2, 0, 0], namaFile: "indeks-sentralitas",
+      kelas: (v, i, j) => (j === 4 && skor[i].orde === 1 ? "ok" : ""),
+    });
+    K.tabelHasil(document.getElementById("t-kelas"), {
+      kolom: ["Orde", "Indeks dari", "Indeks sampai", "Kelurahan"],
+      baris: kelas.map(([o, a, b], i) => [o, a, b, skor.filter((s) => s.orde === i + 1).map((s) => s.kel).join(", ") || "–"]),
+      desimal: [0, 2, 2, 0], namaFile: "kelas-orde",
+    });
+    K.tabelHasil(document.getElementById("t-bobot"), {
+      kolom: ["Fasilitas", "Jumlah di kecamatan (T)", "Bobot C = t/T", "Keterangan"],
+      baris: bobot.map((b) => [b.f, b.T, b.C, b.T > 0 ? "" : "diabaikan (tidak ada di seluruh kelurahan)"]),
+      desimal: [0, 0, 3, 0], namaFile: "bobot-fasilitas",
+    });
+    const WARNA_ORDE = ["#1f6f5c", "#e6850e", "#7f8c8d", "#1f78b4", "#8e44ad", "#d7301f", "#33a02c", "#b8860b", "#0b8a8a", "#6a5acd"];
+    K.grafik("g-indeks", {
+      type: "bar",
+      data: { labels: urut.map((s) => s.kel), datasets: [{ label: "Indeks sentralitas", data: urut.map((s) => s.indeks), backgroundColor: urut.map((s) => WARNA_ORDE[s.orde - 1]) }] },
+      options: { plugins: { legend: { display: false }, title: { display: true, text: `Indeks sentralitas per kelurahan (warna = orde, ${kelas.map((k, i) => `${k[0]}: ${["hijau", "oranye", "abu-abu", "biru", "ungu", "merah", "hijau muda", "emas", "toska", "nila"][i]}`).join(", ")})` } } },
+    });
+  },
+});
+</script>
+</body>
+</html>

@@ -17,7 +17,7 @@
     let t = String(v).trim().replace(/\s|%/g, "");
     if (!t) return NaN;
     if (/,/.test(t)) t = t.replace(/\./g, "").replace(",", ".");
-    else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+    else if (/^-?[1-9]\d{0,2}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
     const n = Number(t);
     return Number.isFinite(n) ? n : NaN;
   }
@@ -186,7 +186,7 @@
       <div class="notice small" id="k-mode">Angka di bawah dibaca dari Google Sheets. Mengubah angka di halaman ini hanya untuk mencoba (tidak tersimpan); perubahan tetap harus diisi di Sheets.
         <button class="btn-kecil" id="k-reset" hidden>Kembalikan ke data Sheets</button></div>
       <div id="k-status"></div>
-      ${tabs.map((t, i) => `<details class="card blok" ${i === 0 ? "open" : ""}><summary><b>Input: ${S.esc(t.judul)}</b> <span class="small muted">tab <code>${t.nama}</code></span></summary><div id="k-in-${i}"></div></details>`).join("")}
+      ${tabs.map((t, i) => `<details class="card blok" ${i === 0 && !t.tertutup && dataTabs[i].length <= 30 ? "open" : ""}><summary><b>Input: ${S.esc(t.judul)}</b> <span class="small muted">tab <code>${t.nama}</code></span></summary><div id="k-in-${i}"></div></details>`).join("")}
       ${paramTampil.length ? `<details class="card blok"><summary><b>Parameter dan standar</b> <span class="small muted">tab <code>parameter</code></span></summary><div id="k-param"></div></details>` : ""}
       <div id="k-hasil"></div>`;
 

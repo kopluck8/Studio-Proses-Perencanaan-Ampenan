@@ -30,27 +30,27 @@
   const { esc, opsi } = Studio;
   // [no, nama, aspek, dasar, halaman (kosong = belum dibuat)]
   const DAFTAR = [
-    [1, "Proyeksi penduduk (aritmatik, geometrik, eksponensial)", "Demografi", "Template 1 + proposal", ""],
-    [2, "Kepadatan penduduk", "Demografi", "Template 1 + SNI 03-1733-2004", ""],
-    [3, "Struktur penduduk (rasio jenis kelamin, ketergantungan, piramida)", "Demografi", "Proposal", ""],
-    [4, "Kebutuhan rumah & lahan permukiman", "Demografi", "Template 1 (diperbaiki)", ""],
-    [5, "Proyeksi kebutuhan sarana (6 kelompok)", "Sarana & Prasarana", "Template 2 + SNI 03-1733-2004", ""],
-    [6, "Proyeksi prasarana (listrik, air bersih, air limbah, sampah, telekomunikasi)", "Sarana & Prasarana", "Template 7 (diperbaiki)", ""],
-    [7, "Indeks sentralitas antar-kelurahan", "Sarana & Prasarana", "Template sentralitas", ""],
-    [8, "Kecukupan RTH 20%", "Sarana & Prasarana", "UU 26/2007, Permen ATR 14/2022", ""],
-    [9, "Location Quotient", "Ekonomi", "Template 4", ""],
-    [10, "Shift Share", "Ekonomi", "Template 5", ""],
-    [11, "Perubahan / alih fungsi lahan", "Fisik & Ekonomi", "Proposal", ""],
-    [12, "Satuan Kemampuan Lahan (9 SKL)", "Fisik & Lingkungan", "Permen PU 20/PRT/M/2007", ""],
-    [13, "Daya dukung & daya tampung lahan permukiman", "Fisik & Lingkungan", "Proposal", ""],
-    [14, "Keterpaparan bencana per kelurahan", "Fisik & Lingkungan", "Proposal", ""],
-    [15, "Kondisi cagar budaya", "Sosial & Budaya", "Proposal", ""],
-    [16, "Matriks pemangku kepentingan", "Pembiayaan & Kelembagaan", "Proposal", ""],
-    [17, "Efektivitas anggaran", "Pembiayaan & Kelembagaan", "Proposal", ""],
-    [18, "AHP (uji CR, agregasi geometrik)", "Tahap 2 · AHP-WLC", "Proposal", ""],
-    [19, "Generator WLC & rekap Zonasi 5 kelas", "Tahap 2 · AHP-WLC", "Proposal", ""],
-    [20, "Konflik spasial & spatial mismatch", "Tahap 3", "Proposal", ""],
-    [21, "IFAS/EFAS & kuadran SWOT", "Tahap 4", "Proposal", ""],
+    [1, "Proyeksi penduduk (aritmatik, geometrik, eksponensial)", "Demografi", "Template 1 + proposal", "proyeksi-penduduk.html"],
+    [2, "Kepadatan penduduk", "Demografi", "Template 1 + SNI 03-1733-2004", "kepadatan.html"],
+    [3, "Struktur penduduk (rasio jenis kelamin, ketergantungan, piramida)", "Demografi", "Proposal", "struktur-penduduk.html"],
+    [4, "Kebutuhan rumah & lahan permukiman", "Demografi", "Template 1 (diperbaiki)", "kebutuhan-rumah.html"],
+    [5, "Proyeksi kebutuhan sarana (6 kelompok)", "Sarana & Prasarana", "Template 2 + SNI 03-1733-2004", "sarana.html"],
+    [6, "Proyeksi prasarana (listrik, air bersih, air limbah, sampah, telekomunikasi)", "Sarana & Prasarana", "Template 7 (diperbaiki)", "prasarana.html"],
+    [7, "Indeks sentralitas antar-kelurahan", "Sarana & Prasarana", "Template sentralitas", "sentralitas.html"],
+    [8, "Kecukupan RTH 20%", "Sarana & Prasarana", "UU 26/2007, Permen ATR 14/2022", "rth.html"],
+    [9, "Location Quotient", "Ekonomi", "Template 4", "lq.html"],
+    [10, "Shift Share", "Ekonomi", "Template 5", "shift-share.html"],
+    [11, "Perubahan / alih fungsi lahan", "Fisik & Ekonomi", "Proposal", "perubahan-lahan.html"],
+    [12, "Satuan Kemampuan Lahan (9 SKL)", "Fisik & Lingkungan", "Permen PU 20/PRT/M/2007", "skl.html"],
+    [13, "Daya dukung & daya tampung lahan permukiman", "Fisik & Lingkungan", "Proposal", "dddtl.html"],
+    [14, "Keterpaparan bencana per kelurahan", "Fisik & Lingkungan", "Proposal", "bencana.html"],
+    [15, "Kondisi cagar budaya", "Sosial & Budaya", "Proposal", "cagar-budaya.html"],
+    [16, "Matriks pemangku kepentingan", "Pembiayaan & Kelembagaan", "Proposal", "stakeholder.html"],
+    [17, "Efektivitas anggaran", "Pembiayaan & Kelembagaan", "Proposal", "anggaran.html"],
+    [18, "AHP (uji CR, agregasi geometrik)", "Tahap 2 · AHP-WLC", "Proposal", "ahp.html"],
+    [19, "Generator WLC & rekap Zonasi 5 kelas", "Tahap 2 · AHP-WLC", "Proposal", "wlc.html"],
+    [20, "Konflik spasial & spatial mismatch", "Tahap 3", "Proposal", "konflik-mismatch.html"],
+    [21, "IFAS/EFAS & kuadran SWOT", "Tahap 4", "Proposal", "swot.html"],
   ];
   const fA = document.getElementById("f-aspek");
   opsi(fA, DAFTAR.map((d) => d[2]), "Semua aspek");
@@ -60,7 +60,7 @@
     document.getElementById("tabel").innerHTML = rows.map(([no, nama, aspek, dasar, hal]) => `<tr>
       <td class="num">${no}</td><td>${hal ? `<a href="${esc(hal)}">${esc(nama)}</a>` : esc(nama)}</td>
       <td>${esc(aspek)}</td><td class="small">${esc(dasar)}</td>
-      <td>${hal ? '<span class="pill ok">Siap dipakai</span>' : '<span class="pill neutral">Sedang dibuat</span>'}</td></tr>`).join("");
+      <td>${hal ? '<span class="pill ok">Siap diisi</span>' : '<span class="pill neutral">Sedang dibuat</span>'}</td></tr>`).join("");
   }
   fA.addEventListener("change", render);
   render();

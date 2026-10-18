@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kebutuhan Prasarana · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Proyeksi Kebutuhan Prasarana</h1>
+    <p class="muted">Aspek Sarana &amp; Prasarana · PJ Bidang Sarana &amp; Prasarana. Listrik, air bersih, air limbah, persampahan, dan telekomunikasi dihitung dari penduduk (tab <code>penduduk_seri</code>, diproyeksikan). Standar bisa diubah di tab <code>parameter</code>.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li><b>Listrik:</b> KK = P / jiwa per KK; rumah tangga = KK × VA/KK; industri-perdagangan, fasos-ekonomi, perkantoran, penerangan jalan, dan cadangan = persentase dari kebutuhan rumah tangga; total = jumlah semuanya.</li>
+      <li><b>Air bersih:</b> domestik D = P × L/orang/hari; non-domestik ND = (fasum + kantor + komersial + industri)% × D; hidran dan kehilangan = persentase dari (D + ND); rata-rata harian = D + ND + hidran + kehilangan; maksimum harian = rata-rata × faktor maksimum. L/detik = L/hari ÷ 86.400.</li>
+      <li><b>Air limbah:</b> total = % air limbah × L/orang/hari × P; rincian industri, perumahan, dan sosial-ekonomi adalah <i>pembagian</i> dari total tersebut.</li>
+      <li><b>Persampahan:</b> volume = P × L/jiwa/hari; berat = P × kg/jiwa/hari; kontainer, TPS 3R, bank sampah, dan dump truck = P / jiwa per unit, dibulatkan ke atas.</li>
+      <li><b>Telekomunikasi:</b> sambungan perumahan = P/100 × sst per 100 jiwa; distribusi poin = sambungan × DP/sst; rumah kabel = sambungan / sst per rumah kabel (dibulatkan ke atas); non-perumahan = % dari sambungan perumahan.</li>
+    </ul>
+    <p>Sumber: template Excel dosen (Proyeksi Prasarana) dengan standar yang sama; penduduk dari kalkulator Proyeksi Penduduk.</p>
+    <p class="small muted">Perbaikan dari template: (1) air limbah di template menjumlahkan buangan domestik ditambah 100% rinciannya sehingga terhitung dua kali; di sini rincian hanya membagi total (perlu dikonfirmasi ke dosen); (2) rumus kebutuhan fasilitas sampah di template bergeser satu baris (sel G4 merujuk B5) sehingga tiap kelurahan memakai penduduk baris berikutnya; di sini setiap kelurahan memakai penduduknya sendiri. Kapasitas eksisting (sambungan PDAM, daya PLN, TPS) belum dibandingkan di halaman ini.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+let tahunPilih = null;
+const PARAM = ["tahun_proyeksi", "metode_proyeksi", "laju_proyeksi", "jiwa_per_kk",
+  "listrik_va_per_kk", "listrik_industri_dagang", "listrik_fasos_ekonomi", "listrik_perkantoran", "listrik_penerangan_jalan", "listrik_cadangan",
+  "air_liter_per_orang", "air_fasum", "air_kantor", "air_komersial", "air_industri", "air_hidran", "air_kehilangan", "air_faktor_maks_harian",
+  "limbah_persen_air", "limbah_industri", "limbah_perumahan", "limbah_sosek",
+  "sampah_liter_per_jiwa", "sampah_kg_per_jiwa", "sampah_jiwa_per_kontainer", "sampah_jiwa_per_tps3r", "sampah_jiwa_per_bank_sampah", "sampah_jiwa_per_truk",
+  "telkom_sst_per_100_jiwa", "telkom_dp_per_sst", "telkom_sst_per_rumah_kabel", "telkom_non_perumahan"];
+
+// Nilai bawaan bila baris parameter belum ada.
+const BAWAAN = { jiwa_per_kk: 4, listrik_va_per_kk: 900, listrik_industri_dagang: 75, listrik_fasos_ekonomi: 15, listrik_perkantoran: 10,
+  listrik_penerangan_jalan: 1, listrik_cadangan: 5, air_liter_per_orang: 150, air_fasum: 2, air_kantor: 2, air_komersial: 3, air_industri: 3,
+  air_hidran: 10, air_kehilangan: 20, air_faktor_maks_harian: 1.15, limbah_persen_air: 70, limbah_industri: 27, limbah_perumahan: 33, limbah_sosek: 40,
+  sampah_liter_per_jiwa: 2.5, sampah_kg_per_jiwa: 0.5, sampah_jiwa_per_kontainer: 3200, sampah_jiwa_per_tps3r: 2500, sampah_jiwa_per_bank_sampah: 3000,
+  sampah_jiwa_per_truk: 3200, telkom_sst_per_100_jiwa: 17, telkom_dp_per_sst: 8, telkom_sst_per_rumah_kabel: 500, telkom_non_perumahan: 25 };
+
+function hitungPrasarana(P, q) {
+  const KK = P / q.jiwa_per_kk;
+  const rt = KK * q.listrik_va_per_kk;
+  const lain = (q.listrik_industri_dagang + q.listrik_fasos_ekonomi + q.listrik_perkantoran + q.listrik_penerangan_jalan + q.listrik_cadangan) / 100;
+  const D = P * q.air_liter_per_orang;
+  const ND = D * (q.air_fasum + q.air_kantor + q.air_komersial + q.air_industri) / 100;
+  const hidran = (D + ND) * q.air_hidran / 100, hilang = (D + ND) * q.air_kehilangan / 100;
+  const rata = D + ND + hidran + hilang;
+  const limbah = (q.limbah_persen_air / 100) * q.air_liter_per_orang * P;
+  const sst = (P / 100) * q.telkom_sst_per_100_jiwa;
+  const naik = (x) => Math.ceil(x - 1e-9);
+  return {
+    KK, listrikRT: rt / 1000, listrikIndustri: rt * q.listrik_industri_dagang / 100000, listrikFasos: rt * q.listrik_fasos_ekonomi / 100000,
+    listrikKantor: rt * q.listrik_perkantoran / 100000, listrikPJU: rt * q.listrik_penerangan_jalan / 100000, listrikCadangan: rt * q.listrik_cadangan / 100000,
+    listrikTotal: rt * (1 + lain) / 1000,
+    airD: D, airND: ND, airHidran: hidran, airHilang: hilang, airRata: rata, airMaks: rata * q.air_faktor_maks_harian,
+    limbahTotal: limbah / 1000, limbahIndustri: limbah * q.limbah_industri / 100000, limbahPerumahan: limbah * q.limbah_perumahan / 100000, limbahSosek: limbah * q.limbah_sosek / 100000,
+    sampahVol: P * q.sampah_liter_per_jiwa / 1000, sampahBerat: P * q.sampah_kg_per_jiwa / 1000,
+    kontainer: naik(P / q.sampah_jiwa_per_kontainer), tps3r: naik(P / q.sampah_jiwa_per_tps3r), bank: naik(P / q.sampah_jiwa_per_bank_sampah), truk: naik(P / q.sampah_jiwa_per_truk),
+    sst, dp: sst * q.telkom_dp_per_sst, rk: naik(sst / q.telkom_sst_per_rumah_kabel), nonPerumahan: sst * q.telkom_non_perumahan / 100, sstTotal: sst * (1 + q.telkom_non_perumahan / 100),
+  };
+}
+
+K.halaman({
+  tabs: [{ nama: "penduduk_seri", judul: "Jumlah penduduk per tahun", kunci: ["kelurahan"] }],
+  param: PARAM,
+  hitung({ data, p, el }) {
+    const pr = K.proyeksi(data.penduduk_seri, p);
+    const siap = pr.hasil.filter((h) => h.metode);
+    if (!siap.length) {
+      el.innerHTML = K.pesanKosong("Isi minimal dua tahun data penduduk per kelurahan di tab penduduk_seri agar kebutuhan prasarana bisa dihitung.");
+      return;
+    }
+    const q = {};
+    Object.entries(BAWAAN).forEach(([k, v]) => { q[k] = typeof p[k] === "number" ? p[k] : v; });
+    const tahunDasar = Math.max(...siap.map((h) => h.tahunDasar));
+    const pilihanTahun = ["e", ...pr.target.map(String)];
+    if (!pilihanTahun.includes(tahunPilih)) tahunPilih = pilihanTahun[pilihanTahun.length - 1];
+    const label = (t) => (t === "e" ? `Eksisting (${tahunDasar})` : t);
+    const Pof = (h, t) => (t === "e" ? h.dasar : h.nilai[+t]);
+    const per = siap.map((h) => ({ kel: h.kelurahan, P: Pof(h, tahunPilih), r: hitungPrasarana(Pof(h, tahunPilih), q) }));
+    const Ptot = per.reduce((a, x) => a + x.P, 0);
+    const lps = (lHari) => lHari / 86400;
+
+    el.innerHTML = `
+      <div class="card blok"><h2>Ringkasan kecamatan per tahun</h2>
+        <div id="t-ringkas"></div>
+        <div class="grafik"><canvas id="g-prasarana"></canvas></div>
+      </div>
+      <div class="card blok"><h2>Rincian per kelurahan</h2>
+        <div class="filters"><label class="small">Tahun <select id="p-tahun">${pilihanTahun.map((t) => `<option value="${t}" ${t === tahunPilih ? "selected" : ""}>${label(t)}</option>`).join("")}</select></label>
+          <span class="small muted">Penduduk ${label(tahunPilih)}: <b>${K.fmt(Ptot)}</b> jiwa</span></div>
+        <h3>Listrik (kVA)</h3><div id="t-listrik"></div>
+        <h3 style="margin-top:1rem">Air bersih</h3><div id="t-air"></div>
+        <h3 style="margin-top:1rem">Air limbah (m³/hari)</h3><div id="t-limbah"></div>
+        <h3 style="margin-top:1rem">Persampahan</h3><div id="t-sampah"></div>
+        <h3 style="margin-top:1rem">Telekomunikasi</h3><div id="t-telkom"></div>
+      </div>`;
+
+    // Ringkasan semua tahun (kecamatan): jumlah dari tiap kelurahan, fasilitas dibulatkan per kelurahan.
+    const tahunSemua = pilihanTahun;
+    const ringkas = tahunSemua.map((t) => {
+      const rs = siap.map((h) => hitungPrasarana(Pof(h, t), q));
+      const s = (k) => rs.reduce((a, r) => a + r[k], 0);
+      return { t, P: siap.reduce((a, h) => a + Pof(h, t), 0), s };
+    });
+    K.tabelHasil(document.getElementById("t-ringkas"), {
+      kolom: ["Tahun", "Penduduk (jiwa)", "KK", "Listrik total (kVA)", "Air bersih rata-rata (L/detik)", "Air bersih maks. harian (L/detik)",
+        "Air limbah (m³/hari)", "Sampah (m³/hari)", "Sampah (ton/hari)", "TPS 3R (unit)", "Sambungan telepon (sst)"],
+      baris: ringkas.map((x) => [label(x.t), x.P, x.s("KK"), x.s("listrikTotal"), lps(x.s("airRata")), lps(x.s("airMaks")),
+        x.s("limbahTotal"), x.s("sampahVol"), x.s("sampahBerat"), x.s("tps3r"), x.s("sstTotal")]),
+      desimal: [0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0], namaFile: "prasarana-ringkasan",
+      catatan: "Jumlah dari 10 kelurahan; jumlah unit fasilitas dibulatkan ke atas per kelurahan.",
+    });
+
+    const tabel = (id, kolom, f, desimal, nama) => K.tabelHasil(document.getElementById(id), {
+      kolom: ["Kelurahan", "Penduduk", ...kolom],
+      baris: [...per.map((x) => [x.kel, x.P, ...f(x.r)]), ["Kecamatan Ampenan", Ptot, ...kolom.map((_, i) => per.reduce((a, x) => a + f(x.r)[i], 0))]],
+      desimal: [0, 0, ...desimal], namaFile: `${nama}-${tahunPilih}`,
+    });
+    tabel("t-listrik", ["KK", "Rumah tangga", "Industri & perdagangan", "Fasos-ekonomi", "Perkantoran", "Penerangan jalan", "Cadangan", "Total"],
+      (r) => [r.KK, r.listrikRT, r.listrikIndustri, r.listrikFasos, r.listrikKantor, r.listrikPJU, r.listrikCadangan, r.listrikTotal], [0, 1, 1, 1, 1, 1, 1, 1], "listrik");
+    tabel("t-air", ["Domestik (L/hari)", "Non-domestik (L/hari)", "Hidran (L/hari)", "Kehilangan (L/hari)", "Rata-rata (L/hari)", "Rata-rata (L/detik)", "Maks. harian (L/detik)"],
+      (r) => [r.airD, r.airND, r.airHidran, r.airHilang, r.airRata, lps(r.airRata), lps(r.airMaks)], [0, 0, 0, 0, 0, 2, 2], "air-bersih");
+    tabel("t-limbah", ["Total", "Industri", "Perumahan", "Sosial-ekonomi"],
+      (r) => [r.limbahTotal, r.limbahIndustri, r.limbahPerumahan, r.limbahSosek], [1, 1, 1, 1], "air-limbah");
+    tabel("t-sampah", ["Volume (m³/hari)", "Berat (ton/hari)", "Kontainer", "TPS 3R", "Bank sampah", "Dump truck"],
+      (r) => [r.sampahVol, r.sampahBerat, r.kontainer, r.tps3r, r.bank, r.truk], [2, 2, 0, 0, 0, 0], "sampah");
+    tabel("t-telkom", ["Sambungan perumahan", "Distribusi poin", "Rumah kabel", "Sambungan non-perumahan", "Total sambungan"],
+      (r) => [r.sst, r.dp, r.rk, r.nonPerumahan, r.sstTotal], [0, 0, 0, 0, 0], "telekomunikasi");
+
+    K.grafik("g-prasarana", {
+      type: "bar",
+      data: { labels: per.map((x) => x.kel), datasets: [
+        { label: "Air bersih maks. harian (L/detik)", data: per.map((x) => lps(x.r.airMaks)), backgroundColor: "#1f78b4", yAxisID: "y" },
+        { label: "Listrik total (kVA ÷ 100)", data: per.map((x) => x.r.listrikTotal / 100), backgroundColor: "#e6850e", yAxisID: "y" },
+        { label: "Sampah (m³/hari)", data: per.map((x) => x.r.sampahVol), backgroundColor: "#7f8c8d", yAxisID: "y" },
+      ] },
+      options: { plugins: { legend: { position: "bottom" }, title: { display: true, text: `Kebutuhan prasarana per kelurahan, ${label(tahunPilih)}` } } },
+    });
+    document.getElementById("p-tahun").onchange = (e) => { tahunPilih = e.target.value; this.hitung({ data, p, el }); };
+  },
+});
+</script>
+</body>
+</html>

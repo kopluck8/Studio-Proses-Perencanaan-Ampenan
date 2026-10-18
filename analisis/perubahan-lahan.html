@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perubahan dan Alih Fungsi Lahan · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Perubahan dan Alih Fungsi Lahan</h1>
+    <p class="muted">Aspek Fisik &amp; Lingkungan dan Ekonomi · PJ Bidang Fisik &amp; Lingkungan bersama Bidang Ekonomi &amp; Permukiman. Isi luas tiap guna lahan per kelurahan untuk dua titik tahun (hasil digitasi citra di QGIS) di tab <code>lahan</code>, dan tahunnya di tab <code>lahan_meta</code>. Kelas guna lahan boleh ditambah atau diganti.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>Perubahan luas <code>ΔL = L₂ − L₁</code> (ha) dan <code>ΔL / L₁ × 100%</code></li>
+      <li>Laju perubahan per tahun <code>(L₂ − L₁) / L₁ / Δt × 100%</code>; nilai negatif berarti luasnya berkurang</li>
+      <li>Laju alih fungsi lahan pertanian (KP2B) <code>(L₁ − L₂) / L₁ / Δt × 100%</code>, dihitung untuk kelas yang namanya memuat "Sawah" atau "KP2B"</li>
+      <li>Komposisi guna lahan <code>Lᵢ / ΣL × 100%</code> per kelurahan</li>
+    </ul>
+    <p>Δt = tahun akhir − tahun awal. Sumber: proposal Bab 3.3.2 (penggunaan lahan eksisting dan perubahan; pengaruh ekonomi terhadap konversi KP2B di Pejeruk dan Ampenan Utara). Luas diperoleh dari digitasi on-screen citra satelit dan groundcheck.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+K.halaman({
+  tabs: [
+    { nama: "lahan", judul: "Luas guna lahan per kelurahan", kunci: ["kelurahan"], teks: ["guna_lahan"], tambahBaris: true },
+    { nama: "lahan_meta", judul: "Tahun pengamatan", kunci: ["kunci"], teks: ["nilai"] },
+  ],
+  hitung({ data, el }) {
+    const esc = Studio.esc;
+    const meta = Object.fromEntries(data.lahan_meta.map((r) => [r.kunci, String(r.nilai ?? "").trim()]));
+    const t1 = K.angka(meta.tahun_awal), t2 = K.angka(meta.tahun_akhir);
+    const dt = K.ada(t1) && K.ada(t2) && t2 > t1 ? t2 - t1 : NaN;
+    const lbl1 = K.ada(t1) ? String(t1) : "awal", lbl2 = K.ada(t2) ? String(t2) : "akhir";
+    const baris = data.lahan.map((r) => ({ kel: String(r.kelurahan || "").trim(), gl: String(r.guna_lahan || "").trim(),
+      L1: K.angka(r.luas_tahun_awal_ha), L2: K.angka(r.luas_tahun_akhir_ha) })).filter((b) => b.gl && (K.ada(b.L1) || K.ada(b.L2)));
+    if (!baris.length) {
+      el.innerHTML = K.pesanKosong("Isi luas guna lahan tahun awal dan/atau tahun akhir di tab lahan, serta tahun_awal dan tahun_akhir di tab lahan_meta.");
+      return;
+    }
+    const kelas = [...new Set(baris.map((b) => b.gl))];
+    const kels = K.urutKel([...new Set(baris.map((b) => b.kel))].map((k) => ({ kelurahan: k }))).map((r) => r.kelurahan);
+    const jml = (f, k) => baris.filter(f).reduce((a, b) => a + (K.ada(b[k]) ? b[k] : 0), 0);
+    const laju = (a, b) => (K.ada(dt) && a > 0 ? ((b - a) / a / dt) * 100 : NaN);
+    const pertanian = (g) => /sawah|kp2b/i.test(g);
+
+    // Rekap kecamatan per kelas guna lahan
+    const rekap = kelas.map((g) => { const L1 = jml((b) => b.gl === g, "L1"), L2 = jml((b) => b.gl === g, "L2"); return [g, L1, L2, L2 - L1, L1 > 0 ? ((L2 - L1) / L1) * 100 : NaN, laju(L1, L2)]; });
+    const T1 = jml(() => true, "L1"), T2 = jml(() => true, "L2");
+    const kp1 = jml((b) => pertanian(b.gl), "L1"), kp2 = jml((b) => pertanian(b.gl), "L2");
+
+    el.innerHTML = `
+      <div class="card blok"><h2>Perubahan guna lahan Kecamatan Ampenan (${esc(lbl1)}–${esc(lbl2)})</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Luas terdata ${esc(lbl1)} / ${esc(lbl2)}</span><b>${K.fmt(T1, 1)} / ${K.fmt(T2, 1)} ha</b></div>
+          <div><span class="small muted">Lahan pertanian (sawah/KP2B) beralih fungsi</span><b>${K.fmt(kp1 - kp2, 2)} ha</b></div>
+          <div><span class="small muted">Laju alih fungsi pertanian</span><b>${K.ada(dt) && kp1 > 0 ? K.fmt(((kp1 - kp2) / kp1 / dt) * 100, 2) + "%/tahun" : "–"}</b></div>
+        </div>
+        ${K.ada(dt) ? "" : '<p class="small"><span class="pill warn">Tahun belum diisi</span> Laju per tahun baru dihitung setelah tahun_awal dan tahun_akhir diisi di tab lahan_meta.</p>'}
+        <div id="t-rekap"></div>
+      </div>
+      <div class="card blok"><h2>Alih fungsi lahan pertanian per kelurahan</h2><div id="t-kp2b"></div></div>
+      <div class="card blok"><h2>Perubahan luas per kelurahan dan guna lahan (ha)</h2><div id="t-matriks"></div></div>
+      <div class="card blok"><h2>Komposisi guna lahan ${esc(lbl2)}</h2><div id="t-komp"></div>
+        <div class="grafik" style="height:${Math.max(320, kels.length * 34 + 90)}px"><canvas id="g-komp"></canvas></div></div>`;
+
+    K.tabelHasil(document.getElementById("t-rekap"), {
+      kolom: ["Guna lahan", `Luas ${lbl1} (ha)`, `Luas ${lbl2} (ha)`, "Perubahan (ha)", "Perubahan (%)", "Laju (%/tahun)"],
+      baris: [...rekap, ["Jumlah", T1, T2, T2 - T1, T1 > 0 ? ((T2 - T1) / T1) * 100 : NaN, laju(T1, T2)]],
+      desimal: [0, 2, 2, 2, 2, 2],
+      kelas: (v, i, j) => (j === 3 && K.ada(v) && Math.abs(v) > 1e-9 ? (v < 0 ? "bad" : "ok") : ""),
+      namaFile: "perubahan-lahan-kecamatan",
+      catatan: "Hijau = bertambah, merah = berkurang.",
+    });
+
+    const barisKp = kels.map((k) => {
+      const a = jml((b) => b.kel === k && pertanian(b.gl), "L1"), b2 = jml((b) => b.kel === k && pertanian(b.gl), "L2");
+      const pm1 = jml((b) => b.kel === k && /permukiman/i.test(b.gl), "L1"), pm2 = jml((b) => b.kel === k && /permukiman/i.test(b.gl), "L2");
+      return [k, a, b2, a - b2, K.ada(dt) && a > 0 ? ((a - b2) / a / dt) * 100 : NaN, pm2 - pm1];
+    });
+    barisKp.sort((x, y) => (y[3] || 0) - (x[3] || 0));
+    K.tabelHasil(document.getElementById("t-kp2b"), {
+      kolom: ["Kelurahan", `Sawah/KP2B ${lbl1} (ha)`, `Sawah/KP2B ${lbl2} (ha)`, "Beralih fungsi (ha)", "Laju alih fungsi (%/tahun)", "Pertambahan permukiman (ha)"],
+      baris: barisKp,
+      desimal: [0, 2, 2, 2, 2, 2],
+      kelas: (v, i, j) => (j === 3 && K.ada(v) && v > 0 ? "bad" : ""),
+      namaFile: "alih-fungsi-kp2b",
+      catatan: "Diurutkan dari alih fungsi terbesar. Laju positif = lahan pertanian berkurang.",
+    });
+
+    K.tabelHasil(document.getElementById("t-matriks"), {
+      kolom: ["Kelurahan", ...kelas, "Jumlah"],
+      baris: kels.map((k) => {
+        const d = kelas.map((g) => { const r = baris.filter((b) => b.kel === k && b.gl === g); return r.length ? jml((b) => b.kel === k && b.gl === g, "L2") - jml((b) => b.kel === k && b.gl === g, "L1") : NaN; });
+        return [k, ...d, d.reduce((a, v) => a + (K.ada(v) ? v : 0), 0)];
+      }),
+      desimal: [0, ...kelas.map(() => 2), 2],
+      kelas: (v, i, j) => (j > 0 && K.ada(v) && Math.abs(v) > 1e-9 ? (v < 0 ? "bad" : "ok") : ""),
+      namaFile: "perubahan-lahan-matriks",
+    });
+
+    const komp = kels.map((k) => { const tot = jml((b) => b.kel === k, "L2"); return [k, ...kelas.map((g) => (tot > 0 ? (jml((b) => b.kel === k && b.gl === g, "L2") / tot) * 100 : NaN)), tot]; });
+    K.tabelHasil(document.getElementById("t-komp"), {
+      kolom: ["Kelurahan", ...kelas.map((g) => `${g} (%)`), "Luas terdata (ha)"],
+      baris: komp, desimal: [0, ...kelas.map(() => 1), 2], namaFile: "komposisi-guna-lahan",
+    });
+    K.grafik("g-komp", {
+      type: "bar",
+      data: { labels: kels, datasets: kelas.map((g, i) => ({ label: g, data: komp.map((r) => r[i + 1]), backgroundColor: K.WARNA[i % 10] })) },
+      options: { indexAxis: "y", scales: { x: { stacked: true, max: 100, title: { display: true, text: "% luas kelurahan" } }, y: { stacked: true } },
+        plugins: { legend: { position: "bottom" }, title: { display: true, text: `Komposisi guna lahan ${lbl2} per kelurahan` } } },
+    });
+  },
+});
+</script>
+</body>
+</html>

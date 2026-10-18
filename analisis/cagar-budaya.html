@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kondisi Cagar Budaya · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Kondisi Cagar Budaya</h1>
+    <p class="muted">Aspek Sosial &amp; Budaya · PJ Bidang Sosial, Budaya &amp; Kependudukan. Isi inventaris objek di tab <code>cagar_budaya</code>; baris bisa ditambah sesuai hasil survei.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>Penilaian keaslian fasad per bangunan: <code>3 = asli</code>, <code>2 = berubah sebagian</code>, <code>1 = berubah total</code>.</li>
+      <li>Indeks keaslian kelurahan = rata-rata nilai fasad objek yang sudah dinilai (rentang 1–3).</li>
+      <li><code>% beralih fungsi = objek dengan fungsi sekarang berbeda dari fungsi awal / jumlah objek × 100</code> (kolom beralih_fungsi diisi "ya").</li>
+    </ul>
+    <p>Bila kolom kelurahan kosong tetapi lat/lon terisi, kelurahan ditentukan otomatis dari batas AOI. Data: Dinas Kebudayaan &amp; Pariwisata Kota Mataram, BPK Wilayah XV, dan survei geotagging Kawasan Kota Tua Ampenan. Sumber metode: proposal, aspek Sosial &amp; Budaya (Cagar Budaya sebagai objek perlindungan).</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+const LABEL_FASAD = { 3: "Asli", 2: "Berubah sebagian", 1: "Berubah total" };
+// Kelurahan dari koordinat (batas AOI) bila kolom kelurahan kosong.
+function dalamPoligon(x, y, ring) {
+  let d = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) d = !d;
+  }
+  return d;
+}
+function cariKelurahan(lat, lon, aoi) {
+  for (const f of aoi.features || []) {
+    const g = f.geometry;
+    const polys = g.type === "MultiPolygon" ? g.coordinates : [g.coordinates];
+    if (polys.some((p) => dalamPoligon(lon, lat, p[0]) && !p.slice(1).some((h) => dalamPoligon(lon, lat, h)))) {
+      const n = f.properties.WADMKD || f.properties.NAMOBJ || "";
+      return n === "Pajarakan Karya" ? "Pejarakan Karya" : n;
+    }
+  }
+  return "";
+}
+const aoiJanji = Studio.bacaJSON("data/geo/batas_ampenan.geojson").catch(() => ({ features: [] }));
+aoiJanji.then((aoi) => K.halaman({
+  tabs: [{
+    nama: "cagar_budaya", judul: "Inventaris objek cagar budaya", tambahBaris: true,
+    teks: ["nama_objek", "kelurahan", "jenis", "status", "fungsi_awal", "fungsi_sekarang", "beralih_fungsi", "foto", "catatan"],
+  }],
+  hitung({ data, el }) {
+    const objek = data.cagar_budaya.filter((r) => String(r.nama_objek || "").trim()).map((r) => {
+      let kel = String(r.kelurahan || "").trim(), dariKoordinat = false;
+      const lat = K.angka(r.lat), lon = K.angka(r.lon);
+      if (!kel && K.ada(lat) && K.ada(lon)) { kel = cariKelurahan(lat, lon, aoi); dariKoordinat = !!kel; }
+      const f = K.angka(r.keaslian_fasad);
+      return { ...r, kel: kel || "(kelurahan belum diisi)", dariKoordinat, fasad: [1, 2, 3].includes(f) ? f : NaN, alih: Studio.benar(r.beralih_fungsi) };
+    });
+    const dinilai = objek.filter((o) => K.ada(o.fasad));
+    if (!objek.length) { el.innerHTML = K.pesanKosong("Isi daftar objek cagar budaya di tab cagar_budaya."); return; }
+    const rata = (a) => (a.length ? a.reduce((s, o) => s + o.fasad, 0) / a.length : NaN);
+    const pct = (a, b) => (b ? (a / b) * 100 : NaN);
+    const nAlih = objek.filter((o) => o.alih).length;
+
+    const kelList = [...new Set(objek.map((o) => o.kel))].sort((a, b) => {
+      const i = (n) => { const x = K.KELURAHAN.indexOf(n); return x < 0 ? 99 : x; };
+      return i(a) - i(b);
+    });
+    const rekap = kelList.map((k) => {
+      const g = objek.filter((o) => o.kel === k), gd = g.filter((o) => K.ada(o.fasad));
+      const n = (v) => gd.filter((o) => o.fasad === v).length;
+      return { k, jumlah: g.length, dinilai: gd.length, asli: n(3), sebagian: n(2), total: n(1), indeks: rata(gd), alih: g.filter((o) => o.alih).length };
+    });
+
+    el.innerHTML = `
+      <div class="card blok"><h2>Ringkasan kondisi</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Objek terdaftar</span><b>${objek.length}</b></div>
+          <div><span class="small muted">Sudah dinilai fasadnya</span><b>${dinilai.length}</b></div>
+          <div><span class="small muted">Indeks keaslian rata-rata (1–3)</span><b>${K.fmt(rata(dinilai), 2)}</b></div>
+          <div><span class="small muted">Fasad masih asli</span><b>${K.fmt(pct(dinilai.filter((o) => o.fasad === 3).length, dinilai.length), 1)}%</b></div>
+          <div><span class="small muted">Beralih fungsi</span><b>${K.fmt(pct(nAlih, objek.length), 1)}%</b><span class="small muted">${nAlih} objek</span></div>
+        </div>
+        ${dinilai.length ? "" : '<p><span class="pill warn">Belum ada penilaian</span> <span class="small muted">Isi kolom keaslian_fasad: 3 = asli, 2 = berubah sebagian, 1 = berubah total.</span></p>'}
+        <h3>Rekap per kelurahan</h3>
+        <div id="t-rekap"></div>
+        <div class="grafik"><canvas id="g-cb"></canvas></div>
+      </div>
+      <div class="card blok"><h2>Daftar objek</h2><div id="t-objek"></div></div>`;
+
+    K.tabelHasil(document.getElementById("t-rekap"), {
+      kolom: ["Kelurahan", "Objek", "Dinilai", "Asli (3)", "Berubah sebagian (2)", "Berubah total (1)", "Indeks keaslian", "Beralih fungsi", "Beralih fungsi (%)"],
+      baris: [
+        ...rekap.map((r) => [r.k, r.jumlah, r.dinilai, r.asli, r.sebagian, r.total, r.indeks, r.alih, pct(r.alih, r.jumlah)]),
+        ["Kecamatan Ampenan", objek.length, dinilai.length, ...[3, 2, 1].map((v) => dinilai.filter((o) => o.fasad === v).length), rata(dinilai), nAlih, pct(nAlih, objek.length)],
+      ],
+      desimal: [0, 0, 0, 0, 0, 0, 2, 0, 1],
+      kelas: (v, i, j) => (j === 6 && K.ada(v) ? (v < 1.5 ? "bad" : v < 2.5 ? "warn" : "ok") : ""),
+      namaFile: "rekap-cagar-budaya",
+      catatan: "Indeks keaslian = rata-rata nilai fasad objek yang sudah dinilai (3 = semua asli).",
+    });
+    K.tabelHasil(document.getElementById("t-objek"), {
+      kolom: ["Objek", "Kelurahan", "Jenis", "Status", "Fasad", "Fungsi awal", "Fungsi sekarang", "Beralih fungsi", "Catatan"],
+      baris: objek.map((o) => [o.nama_objek, o.kel + (o.dariKoordinat ? " *" : ""), o.jenis || "", o.status || "",
+        K.ada(o.fasad) ? `${o.fasad} · ${LABEL_FASAD[o.fasad]}` : "belum dinilai", o.fungsi_awal || "", o.fungsi_sekarang || "", o.alih ? "ya" : "", o.catatan || ""]),
+      kelas: (v, i, j) => (j === 4 ? (/^1/.test(v) ? "bad" : /^2/.test(v) ? "warn" : /^3/.test(v) ? "ok" : "") : ""),
+      namaFile: "daftar-cagar-budaya",
+      catatan: "* kelurahan ditentukan dari koordinat dan batas AOI.",
+    });
+    K.grafik("g-cb", {
+      type: "bar",
+      data: { labels: rekap.map((r) => r.k), datasets: [
+        { label: "Asli", data: rekap.map((r) => r.asli), backgroundColor: "#2f7d3a" },
+        { label: "Berubah sebagian", data: rekap.map((r) => r.sebagian), backgroundColor: "#e6850e" },
+        { label: "Berubah total", data: rekap.map((r) => r.total), backgroundColor: "#d7301f" },
+      ] },
+      options: { scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: "Jumlah objek" } } },
+        plugins: { legend: { position: "bottom" }, title: { display: true, text: "Keaslian fasad per kelurahan" } } },
+    });
+  },
+}));
+</script>
+</body>
+</html>

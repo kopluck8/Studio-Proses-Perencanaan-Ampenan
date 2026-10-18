@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kecukupan RTH · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Kecukupan RTH 20%</h1>
+    <p class="muted">Aspek Sarana &amp; Prasarana · PJ Bidang Sarana &amp; Prasarana. Isi luas RTH publik dan privat per kelurahan (ha, hasil inventaris DLH dan digitasi) di tab <code>rth</code>. Luas kelurahan dari tab <code>kelurahan</code> (batas AOI).</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>% RTH publik = <code>luas RTH publik / luas wilayah × 100%</code>; target = <code>20% × luas wilayah</code>.</li>
+      <li>Defisit (−) atau surplus (+) = <code>luas RTH publik − target</code>. Hal yang sama untuk RTH privat dengan target 10%.</li>
+    </ul>
+    <p>Sumber: UU 26/2007 tentang Penataan Ruang (RTH minimal 30%: publik 20%, privat 10%), Permen ATR/BPN 14/2022 tentang Penyediaan dan Pemanfaatan RTH; metode dari proposal (aspek sarana dan prasarana). Target bisa diubah di tab <code>parameter</code>.</p>
+    <p class="small muted">Kebutuhan taman berdasarkan jumlah penduduk (taman RT, RW, kelurahan dalam m²/jiwa) dihitung di kalkulator Kebutuhan Sarana. Rumus jalur hijau di template dosen merujuk sel kosong (E4019) dan tidak dipakai.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+K.halaman({
+  tabs: [
+    { nama: "rth", judul: "Luas RTH per kelurahan (ha)", kunci: ["kelurahan"] },
+    { nama: "kelurahan", judul: "Luas kelurahan", kunci: ["kelurahan"] },
+  ],
+  param: ["rth_publik_target", "rth_privat_target"],
+  hitung({ data, p, el }) {
+    const tPub = typeof p.rth_publik_target === "number" ? p.rth_publik_target : 20;
+    const tPri = typeof p.rth_privat_target === "number" ? p.rth_privat_target : 10;
+    const luas = {};
+    data.kelurahan.forEach((r) => { luas[r.kelurahan] = K.angka(r.luas_ha); });
+    const rows = K.urutKel(data.rth).map((r) => {
+      const L = luas[r.kelurahan], pub = K.angka(r.rth_publik_ha), pri = K.angka(r.rth_privat_ha);
+      return { kel: r.kelurahan, L, pub, pri, pPub: (pub / L) * 100, pPri: (pri / L) * 100, sPub: pub - (tPub / 100) * L, sPri: pri - (tPri / 100) * L };
+    });
+    const isi = rows.filter((r) => K.ada(r.pub) && K.ada(r.L));
+    if (!isi.length) {
+      el.innerHTML = K.pesanKosong("Isi luas RTH publik (ha) minimal untuk satu kelurahan di tab rth.");
+      return;
+    }
+    const sum = (arr, k) => arr.reduce((a, r) => a + (K.ada(r[k]) ? r[k] : 0), 0);
+    const Ltot = sum(isi, "L"), pubTot = sum(isi, "pub");
+    const isiPri = rows.filter((r) => K.ada(r.pri) && K.ada(r.L));
+    const priTot = sum(isiPri, "pri"), LtotPri = sum(isiPri, "L");
+    const total = ["Kecamatan Ampenan" + (isi.length < rows.length ? ` (${isi.length} kelurahan terisi)` : ""), Ltot, pubTot, (pubTot / Ltot) * 100, (tPub / 100) * Ltot, pubTot - (tPub / 100) * Ltot,
+      isiPri.length ? priTot : NaN, isiPri.length ? (priTot / LtotPri) * 100 : NaN, isiPri.length ? priTot - (tPri / 100) * LtotPri : NaN];
+    el.innerHTML = `
+      <div class="card blok"><h2>Kecukupan RTH per kelurahan</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">RTH publik kecamatan</span><b>${K.fmt((pubTot / Ltot) * 100, 1)}%</b></div>
+          <div><span class="small muted">${pubTot - (tPub / 100) * Ltot < 0 ? "Defisit" : "Surplus"} RTH publik</span><b>${K.fmt(Math.abs(pubTot - (tPub / 100) * Ltot), 2)} ha</b></div>
+          <div><span class="small muted">Kelurahan memenuhi ${K.fmt(tPub)}%</span><b>${isi.filter((r) => r.sPub >= 0).length} / ${isi.length}</b></div>
+        </div>
+        <div id="t-rth"></div>
+        <div class="grafik"><canvas id="g-rth"></canvas></div>
+      </div>`;
+    K.tabelHasil(document.getElementById("t-rth"), {
+      kolom: ["Kelurahan", "Luas wilayah (ha)", "RTH publik (ha)", "RTH publik (%)", `Target publik ${K.fmt(tPub)}% (ha)`, "Selisih publik (ha)", "RTH privat (ha)", "RTH privat (%)", `Selisih privat ${K.fmt(tPri)}% (ha)`],
+      baris: [...rows.map((r) => [r.kel, r.L, r.pub, r.pPub, (tPub / 100) * r.L, r.sPub, r.pri, r.pPri, r.sPri]), total],
+      desimal: [0, 2, 2, 2, 2, 2, 2, 2, 2], namaFile: "kecukupan-rth",
+      kelas: (v, i, j) => ((j === 5 || j === 8) && K.ada(v) ? (v < 0 ? "defisit" : "surplus") : ""),
+      catatan: "Merah = defisit, hijau = memenuhi target.",
+    });
+    K.grafik("g-rth", {
+      type: "bar",
+      data: { labels: isi.map((r) => r.kel), datasets: [
+        { type: "bar", label: "RTH publik (%)", data: isi.map((r) => r.pPub), backgroundColor: isi.map((r) => (r.sPub < 0 ? "#d7301f" : "#33a02c")) },
+        { type: "line", label: `Target ${K.fmt(tPub)}%`, data: isi.map(() => tPub), borderColor: "#1f6f5c", borderDash: [6, 4], pointRadius: 0 },
+      ] },
+      options: { plugins: { legend: { position: "bottom" }, title: { display: true, text: "Persentase RTH publik terhadap luas kelurahan" } } },
+    });
+  },
+});
+</script>
+</body>
+</html>

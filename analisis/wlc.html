@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generator WLC · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+  .ekspresi { width: 100%; min-height: 6rem; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85rem; padding: .5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--text); }
+  .rentang input { width: 7rem; font: inherit; padding: .25rem .4rem; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--text); text-align: right; }
+</style>
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Generator WLC dan Rekap Zonation 5</h1>
+    <p class="muted">Tahap 2 · Spatial-MCDA · PJ Bidang Fisik dan Kebencanaan. Bobot diambil otomatis dari hasil <a href="ahp.html">AHP</a> (tab <code>ahp_responden</code>). Isi nama layer raster skor (1–5) tiap kriteria di tab <code>wlc_layer</code>, lalu salin ekspresi ke Raster Calculator QGIS. Setelah reklasifikasi, isi luas tiap kelas per kelurahan di tab <code>zonasi_wlc</code>.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li><code>S = Σ (wᵢ × xᵢ)</code>; wᵢ = bobot AHP (Σ wᵢ = 1, CR &lt; 0,10), xᵢ = skor raster kriteria ke-i (1–5, sel 5×5 m, UTM 50S).</li>
+      <li>Bila ada sub-kriteria (Level 2), yang dipakai adalah bobot global = bobot kriteria × bobot lokal; nama layer diisi per sub-kriteria.</li>
+      <li>Kelas equal interval: lebar = (S maks − S min) / 5; Kelas k mencakup S min + (k−1)·lebar sampai S min + k·lebar.</li>
+      <li>Kelas 1 Sangat Rendah (sangat aman/sangat sesuai), 2 Rendah, 3 Sedang (waspada/penyangga), 4 Tinggi (pembatasan), 5 Sangat Tinggi (kritis/sangat tidak sesuai).</li>
+    </ul>
+    <p class="small muted">Sumber: proposal Bab 2.2.2 B dan 3.3.3 (Malczewski, 1999). Luas kelurahan pembanding dari tab <code>kelurahan</code> (batas AOI).</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script src="../assets/js/ahp.js"></script>
+<script>
+(async function () {
+  const [ahpRows, kelRows, paramRows] = await Promise.all([K.tab("ahp_responden"), K.tab("kelurahan"), K.tab("parameter")]);
+  const p0 = K.petaParam(paramRows);
+  const crMaks = K.ada(Number(p0.ahp_cr_maks)) ? Number(p0.ahp_cr_maks) : 0.1;
+  const ahp = AHP.analisis(ahpRows, { crMaks });
+  const luasKel = Object.fromEntries(kelRows.map((r) => [r.kelurahan, K.angka(r.luas_ha)]));
+  const KELAS = ["Sangat Rendah", "Rendah", "Sedang", "Tinggi", "Sangat Tinggi"];
+  const WARNA_KELAS = ["#1a9850", "#91cf60", "#fee08b", "#fc8d59", "#d73027"];
+  const rentang = { min: 1, max: 5 };
+
+  const slug = (s) => "skor_" + String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+  function renderKelas() {
+    const el = document.getElementById("t-kelas");
+    if (!el) return;
+    const { min, max } = rentang;
+    if (!(K.ada(min) && K.ada(max) && max > min)) { el.innerHTML = '<p class="pill warn">S maks harus lebih besar dari S min</p>'; return; }
+    const lebar = (max - min) / 5;
+    const batas = KELAS.map((_, k) => [min + k * lebar, min + (k + 1) * lebar]);
+    K.tabelHasil(el, {
+      kolom: ["Kelas", "Tingkat", "S dari", "S sampai"],
+      baris: batas.map(([a, b], k) => [String(k + 1), KELAS[k], a, b]),
+      desimal: [0, 0, 4, 4], namaFile: "wlc-batas-kelas",
+      catatan: `Lebar kelas ${K.fmt(lebar, 4)}. Kelas terakhir termasuk nilai S maks.`,
+    });
+    const b = batas.map(([, x]) => +x.toFixed(4));
+    const L = '"WLC@1"';
+    document.getElementById("ekspresi-kelas").value =
+      `(${L} < ${b[0]}) * 1 + (${L} >= ${b[0]} AND ${L} < ${b[1]}) * 2 + (${L} >= ${b[1]} AND ${L} < ${b[2]}) * 3 + (${L} >= ${b[2]} AND ${L} < ${b[3]}) * 4 + (${L} >= ${b[3]}) * 5`;
+  }
+
+  K.halaman({
+    tabs: [
+      { nama: "wlc_layer", judul: "Nama layer raster per kriteria", teks: ["kriteria", "nama_layer"], tambahBaris: true },
+      { nama: "zonasi_wlc", judul: "Luas kelas Zonation 5 per kelurahan (ha)", kunci: ["kelurahan"] },
+    ],
+    param: ["ahp_cr_maks"],
+    hitung({ data, el }) {
+      const l1 = ahp.l1;
+      const adaBobot = l1 && l1.gabungan;
+      const layer = Object.fromEntries(data.wlc_layer.map((r) => [String(r.kriteria ?? "").trim(), String(r.nama_layer ?? "").trim()]));
+      const suku = adaBobot ? ahp.global.map((g) => {
+        const nama = g.sub || g.kriteria;
+        return { nama, w: g.global, layer: layer[nama] || "", layerPakai: layer[nama] || slug(nama) };
+      }) : [];
+      const ekspresi = suku.map((s) => `("${s.layerPakai}@1" * ${s.w.toFixed(4)})`).join(" + ");
+
+      el.innerHTML = `
+        <div class="card blok"><h2>1. Ekspresi Raster Calculator</h2>
+          ${adaBobot ? `
+            <p class="small">${l1.konsisten ? '<span class="pill ok">Bobot AHP konsisten</span>' : '<span class="pill bad">CR gabungan AHP belum memenuhi, bobot belum boleh dipakai resmi</span>'}
+              CR gabungan ${K.fmt(l1.gabungan.CR, 4)} dari ${l1.dipakai} responden.</p>
+            <div id="t-suku"></div>
+            <p class="small" style="margin-top:.75rem"><b>Salin ke Raster Calculator QGIS</b> (hasil disimpan sebagai layer <code>WLC</code>):</p>
+            <textarea class="ekspresi" id="ekspresi" readonly>${Studio.esc(ekspresi)}</textarea>
+            <button class="btn-kecil" data-salin="ekspresi">Salin ekspresi</button>`
+          : K.pesanKosong('Bobot AHP belum tersedia. Lengkapi jawaban kuesioner di halaman <a href="ahp.html">AHP</a> terlebih dahulu.')}
+        </div>
+        <div class="card blok"><h2>2. Batas kelas Zonation 5 (equal interval)</h2>
+          <p class="small muted">Isi nilai S minimum dan maksimum dari properti layer WLC di QGIS (bawaan teoretis 1–5).</p>
+          <p class="rentang small">S min <input id="s-min" inputmode="decimal" value="${rentang.min}"> &nbsp; S maks <input id="s-max" inputmode="decimal" value="${rentang.max}"></p>
+          <div id="t-kelas"></div>
+          <p class="small" style="margin-top:.75rem"><b>Ekspresi reklasifikasi</b> (Raster Calculator, input layer <code>WLC</code>):</p>
+          <textarea class="ekspresi" id="ekspresi-kelas" readonly></textarea>
+          <button class="btn-kecil" data-salin="ekspresi-kelas">Salin ekspresi</button>
+        </div>
+        <div class="card blok"><h2>3. Rekap luas Zonation 5 per kelurahan</h2><div id="t-rekap"></div>
+          <div class="grafik"><canvas id="g-rekap"></canvas></div></div>`;
+
+      if (adaBobot) {
+        K.tabelHasil(document.getElementById("t-suku"), {
+          kolom: ["Kriteria / sub-kriteria", "Bobot", "Nama layer"],
+          baris: [...suku.map((s) => [s.nama, s.w, s.layer || `${s.layerPakai} (contoh, isi di tab wlc_layer)`]),
+            ["Jumlah", suku.reduce((a, s) => a + s.w, 0), ""]],
+          desimal: [0, 4, 0], namaFile: "wlc-bobot-layer",
+        });
+      }
+      el.querySelectorAll("[data-salin]").forEach((b) => b.onclick = () => {
+        const t = document.getElementById(b.dataset.salin);
+        navigator.clipboard?.writeText(t.value).then(() => { b.textContent = "Tersalin"; setTimeout(() => (b.textContent = "Salin ekspresi"), 1500); });
+      });
+      ["s-min", "s-max"].forEach((id) => document.getElementById(id).addEventListener("input", (e) => {
+        rentang[id === "s-min" ? "min" : "max"] = K.angka(e.target.value);
+        renderKelas();
+      }));
+      renderKelas();
+
+      // Rekap zonasi
+      const kol = [1, 2, 3, 4, 5].map((k) => `kelas_${k}_ha`);
+      const st = K.statusIsi(data.zonasi_wlc, kol);
+      const rekapEl = document.getElementById("t-rekap");
+      if (!st.isi) { rekapEl.innerHTML = K.pesanKosong("Isi luas tiap kelas per kelurahan (ha) di tab zonasi_wlc dari hasil reklasifikasi QGIS."); return; }
+      const rows = K.urutKel(data.zonasi_wlc).map((r) => {
+        const v = kol.map((k) => K.angka(r[k]) || 0);
+        const tot = v.reduce((a, b) => a + b, 0);
+        return { kel: r.kelurahan, v, tot, luas: luasKel[r.kelurahan] };
+      });
+      const jum = kol.map((_, k) => rows.reduce((a, r) => a + r.v[k], 0));
+      const jumTot = jum.reduce((a, b) => a + b, 0);
+      const jumLuas = rows.reduce((a, r) => a + (r.luas || 0), 0);
+      K.tabelHasil(rekapEl, {
+        kolom: ["Kelurahan", ...KELAS.map((k, i) => `K${i + 1} ${k} (ha)`), "Total (ha)", "Kelas 4–5 (%)", "Terpetakan (%)"],
+        baris: [...rows.map((r) => [r.kel, ...r.v, r.tot, r.tot ? ((r.v[3] + r.v[4]) / r.tot) * 100 : NaN, r.luas ? (r.tot / r.luas) * 100 : NaN]),
+          ["Kecamatan Ampenan", ...jum, jumTot, jumTot ? ((jum[3] + jum[4]) / jumTot) * 100 : NaN, jumLuas ? (jumTot / jumLuas) * 100 : NaN],
+          ["Persentase kecamatan (%)", ...jum.map((x) => (jumTot ? (x / jumTot) * 100 : NaN)), 100, "", ""]],
+        desimal: [0, 2, 2, 2, 2, 2, 2, 1, 1],
+        kelas: (v, i, j) => (j === 7 && v >= 50 ? "bad" : ""),
+        namaFile: "rekap-zonation5",
+        catatan: "Terpetakan = total luas kelas ÷ luas kelurahan (batas AOI); mendekati 100% berarti jumlah luas kelas sama dengan luas kelurahan pada batas AOI.",
+      });
+      K.grafik("g-rekap", {
+        type: "bar",
+        data: { labels: rows.map((r) => r.kel), datasets: KELAS.map((k, i) => ({ label: `Kelas ${i + 1} ${k}`, data: rows.map((r) => r.v[i]), backgroundColor: WARNA_KELAS[i] })) },
+        options: { scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: "ha" } } }, plugins: { legend: { position: "bottom" } } },
+      });
+    },
+  });
+})();
+</script>
+</body>
+</html>

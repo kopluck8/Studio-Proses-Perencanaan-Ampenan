@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shift Share · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Shift Share</h1>
+    <p class="muted">Aspek Ekonomi · PJ Bidang Ekonomi &amp; Permukiman. Memakai tab yang sama dengan kalkulator LQ: <code>ekonomi_sektor</code> (nilai sektor tahun awal dan akhir untuk wilayah studi dan pembanding) serta <code>ekonomi_meta</code>.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>Yᵢⱼ, Y'ᵢⱼ = nilai sektor i di wilayah studi tahun awal dan akhir; Yᵢ, Y'ᵢ = nilai sektor i di wilayah pembanding; Y, Y' = total pembanding</li>
+      <li>Pertumbuhan sektor di wilayah studi <code>rᵢ = (Y'ᵢⱼ − Yᵢⱼ)/Yᵢⱼ</code>; di pembanding <code>Rᵢ = (Y'ᵢ − Yᵢ)/Yᵢ</code>; total pembanding <code>Ra = (Y' − Y)/Y</code></li>
+      <li>Pertumbuhan nasional/regional <code>PN = Yᵢⱼ × Ra</code></li>
+      <li>Pertumbuhan proporsional <code>PP = Yᵢⱼ × (Rᵢ − Ra)</code>: PP &gt; 0 sektor tumbuh cepat, PP &lt; 0 tumbuh lambat</li>
+      <li>Pertumbuhan pangsa wilayah <code>PPW = Yᵢⱼ × (rᵢ − Rᵢ)</code>: PPW &gt; 0 daya saing tinggi, PPW &lt; 0 daya saing rendah</li>
+      <li>Pergeseran bersih <code>PB = PP + PPW</code>: PB ≥ 0 progresif, PB &lt; 0 lamban; perubahan total <code>D = PN + PP + PPW = Y'ᵢⱼ − Yᵢⱼ</code></li>
+    </ul>
+    <p>Kuadran (sumbu x = PP, sumbu y = PPW): I PP+ PPW+ sektor tumbuh cepat dan berdaya saing; II PP− PPW+ tumbuh lambat tetapi berdaya saing (berpotensi); III PP− PPW− tertekan; IV PP+ PPW− tumbuh cepat tetapi daya saing rendah.</p>
+    <p>Sumber: template Excel dosen "Shift Share" (termasuk interpretasi di Sheet3) dan proposal Bab 3.3.2. Pembanding Kota Mataram atau NTB sesuai data yang tersedia.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+// Garis sumbu nol dan label titik di grafik kuadran.
+const sumbuNol = { id: "sumbuNol", afterDatasetsDraw(c) {
+  const g = c.ctx, { left, right, top, bottom } = c.chartArea;
+  const x0 = c.scales.x.getPixelForValue(0), y0 = c.scales.y.getPixelForValue(0);
+  g.save(); g.strokeStyle = "#7f8c8d"; g.setLineDash([4, 4]);
+  if (x0 >= left && x0 <= right) { g.beginPath(); g.moveTo(x0, top); g.lineTo(x0, bottom); g.stroke(); }
+  if (y0 >= top && y0 <= bottom) { g.beginPath(); g.moveTo(left, y0); g.lineTo(right, y0); g.stroke(); }
+  g.setLineDash([]); g.fillStyle = Chart.defaults.color; g.font = "11px " + Chart.defaults.font.family;
+  c.data.datasets[0].data.forEach((d, i) => {
+    const m = c.getDatasetMeta(0).data[i];
+    if (m) g.fillText(d.kode, m.x + 6, m.y - 4);
+  });
+  g.restore();
+} };
+
+K.halaman({
+  tabs: [
+    { nama: "ekonomi_sektor", judul: "Nilai per sektor", kunci: ["sektor"] },
+    { nama: "ekonomi_meta", judul: "Keterangan variabel dan tahun", kunci: ["kunci"], teks: ["nilai"] },
+  ],
+  hitung({ data, el }) {
+    const esc = Studio.esc;
+    const meta = Object.fromEntries(data.ekonomi_meta.map((r) => [r.kunci, String(r.nilai ?? "").trim()]));
+    const semua = data.ekonomi_sektor.map((r) => ({
+      sektor: r.sektor, kode: String(r.sektor).split(".")[0].trim(),
+      Yij: K.angka(r.wilayah_awal), Yij1: K.angka(r.wilayah_akhir), Yi: K.angka(r.pembanding_awal), Yi1: K.angka(r.pembanding_akhir),
+    }));
+    // Total pembanding dari sektor yang kedua tahunnya terisi.
+    const pemb = semua.filter((b) => K.ada(b.Yi) && K.ada(b.Yi1) && b.Yi > 0);
+    const Y = pemb.reduce((a, b) => a + b.Yi, 0), Y1 = pemb.reduce((a, b) => a + b.Yi1, 0);
+    const lengkap = semua.filter((b) => K.ada(b.Yij) && K.ada(b.Yij1) && b.Yij > 0 && K.ada(b.Yi) && K.ada(b.Yi1) && b.Yi > 0);
+    if (!lengkap.length || !(Y > 0)) {
+      el.innerHTML = K.pesanKosong("Isi keempat kolom (wilayah_awal, wilayah_akhir, pembanding_awal, pembanding_akhir) untuk sektor-sektor di tab ekonomi_sektor.");
+      return;
+    }
+    const Ra = (Y1 - Y) / Y;
+    const kuadran = (pp, ppw) => (pp >= 0 && ppw >= 0 ? "I" : pp < 0 && ppw >= 0 ? "II" : pp < 0 ? "III" : "IV");
+    const hasil = lengkap.map((b) => {
+      const ri = (b.Yij1 - b.Yij) / b.Yij, Ri = (b.Yi1 - b.Yi) / b.Yi;
+      const PN = b.Yij * Ra, PP = b.Yij * (Ri - Ra), PPW = b.Yij * (ri - Ri);
+      return { ...b, ri, Ri, PN, PP, PPW, PB: PP + PPW, D: PN + PP + PPW, kuadran: kuadran(PP, PPW) };
+    });
+    const tot = (k) => hasil.reduce((a, h) => a + h[k], 0);
+    const unggul = hasil.filter((h) => h.kuadran === "I");
+    const per = `${meta.tahun_awal || "awal"}–${meta.tahun_akhir || "akhir"}`;
+
+    el.innerHTML = `
+      <div class="card blok"><h2>Komponen shift share (${esc(per)})</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Pertumbuhan total pembanding (Ra)</span><b>${K.fmt(Ra * 100, 2)}%</b></div>
+          <div><span class="small muted">Perubahan total wilayah (D)</span><b>${K.fmt(tot("D"), 1)}</b></div>
+          <div><span class="small muted">Pergeseran bersih (PB)</span><b>${K.fmt(tot("PB"), 1)}</b></div>
+          <div><span class="small muted">Sektor kuadran I</span><b>${unggul.length} dari ${hasil.length}</b></div>
+        </div>
+        <div id="t-ss"></div>
+      </div>
+      <div class="card blok"><h2>Interpretasi dan kuadran</h2><div id="t-int"></div>
+        <div class="grafik" style="height:400px"><canvas id="g-ss"></canvas></div></div>`;
+    K.tabelHasil(document.getElementById("t-ss"), {
+      kolom: ["Sektor", "rᵢ (%)", "Rᵢ (%)", "PN", "PP", "PPW", "PB", "D (= Y' − Y)"],
+      baris: [...hasil.map((h) => [h.sektor, h.ri * 100, h.Ri * 100, h.PN, h.PP, h.PPW, h.PB, h.D]),
+        ["Jumlah", "", "", tot("PN"), tot("PP"), tot("PPW"), tot("PB"), tot("D")]],
+      desimal: [0, 2, 2, 2, 2, 2, 2, 2],
+      kelas: (v, i, j) => (j >= 4 && j <= 6 && K.ada(v) ? (v < 0 ? "bad" : "ok") : ""),
+      namaFile: "shift-share",
+      catatan: `Satuan: ${esc(meta.satuan || "-")}. Wilayah ${esc(meta.wilayah || "-")}, pembanding ${esc(meta.pembanding || "-")}. Sektor yang datanya belum lengkap tidak dihitung.`,
+    });
+    const NAMA_K = { I: "I · tumbuh cepat, berdaya saing", II: "II · lambat, berdaya saing", III: "III · tertekan", IV: "IV · cepat, daya saing rendah" };
+    K.tabelHasil(document.getElementById("t-int"), {
+      kolom: ["Sektor", "Pertumbuhan (PP)", "Daya saing (PPW)", "Pergeseran bersih (PB)", "Kuadran"],
+      baris: hasil.map((h) => [h.sektor, h.PP >= 0 ? "Tumbuh cepat" : "Tumbuh lambat", h.PPW >= 0 ? "Daya saing tinggi" : "Daya saing rendah",
+        h.PB >= 0 ? "Progresif" : "Lamban", NAMA_K[h.kuadran]]),
+      kelas: (v, i, j) => (j === 4 ? (/^I ·/.test(v) ? "ok" : /^III/.test(v) ? "bad" : "warn") : /cepat|tinggi|Progresif/.test(v) ? "ok" : /lambat|rendah|Lamban/.test(v) ? "bad" : ""),
+      namaFile: "shift-share-interpretasi",
+    });
+    const WK = { I: "#1f6f5c", II: "#1f78b4", III: "#d7301f", IV: "#e6850e" };
+    K.grafik("g-ss", {
+      type: "scatter",
+      data: { datasets: [{ label: "Sektor", data: hasil.map((h) => ({ x: h.PP, y: h.PPW, kode: h.kode, nama: h.sektor })),
+        pointRadius: 6, backgroundColor: hasil.map((h) => WK[h.kuadran]) }] },
+      options: {
+        plugins: { legend: { display: false },
+          title: { display: true, text: "Kuadran sektor: PP (sumbu x) vs PPW (sumbu y)" },
+          tooltip: { callbacks: { label: (c) => `${c.raw.nama}: PP ${K.fmt(c.raw.x, 1)}, PPW ${K.fmt(c.raw.y, 1)}` } } },
+        scales: { x: { title: { display: true, text: "PP (pertumbuhan proporsional)" } }, y: { title: { display: true, text: "PPW (daya saing wilayah)" } } },
+      },
+      plugins: [sumbuNol],
+    });
+  },
+});
+</script>
+</body>
+</html>

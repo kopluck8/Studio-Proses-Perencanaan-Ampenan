@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matriks Pemangku Kepentingan · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Matriks Pemangku Kepentingan</h1>
+    <p class="muted">Aspek Pembiayaan &amp; Kelembagaan · PJ Bidang Administrasi, Kebijakan &amp; Profil Wilayah. Beri skor <b>pengaruh</b> dan <b>kepentingan</b> 1–5 untuk tiap pemangku kepentingan (hasil wawancara dan kajian dokumen) di tab <code>stakeholder</code>. Baris boleh ditambah.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <p>Setiap pemangku kepentingan dinilai pada dua sumbu, skala 1 (sangat rendah) sampai 5 (sangat tinggi). Skor di atas 3 dianggap tinggi, skor 3 ke bawah dianggap rendah.</p>
+    <ul>
+      <li><b>Key players</b> (pengaruh tinggi, kepentingan tinggi): dilibatkan erat sejak perumusan</li>
+      <li><b>Keep satisfied</b> (pengaruh tinggi, kepentingan rendah): dijaga dukungannya, dikonsultasikan pada keputusan penting</li>
+      <li><b>Keep informed</b> (pengaruh rendah, kepentingan tinggi): diberi informasi rutin dan ruang menyampaikan aspirasi</li>
+      <li><b>Monitor</b> (pengaruh rendah, kepentingan rendah): dipantau dengan upaya minimal</li>
+    </ul>
+    <p>Sumber: proposal Bab 3.3.2 (aspek pembiayaan dan kelembagaan, analisis stakeholder matrix); kerangka power–interest grid (Eden &amp; Ackermann, 1998).</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+const BATAS = 3; // skor > 3 = tinggi
+const KUADRAN = {
+  kp: { nama: "Key players", warna: "#1f6f5c", saran: "Libatkan erat sejak perumusan" },
+  ks: { nama: "Keep satisfied", warna: "#1f78b4", saran: "Jaga dukungan, konsultasikan keputusan penting" },
+  ki: { nama: "Keep informed", warna: "#e6850e", saran: "Informasikan rutin, tampung aspirasi" },
+  mo: { nama: "Monitor", warna: "#7f8c8d", saran: "Pantau dengan upaya minimal" },
+};
+const kuadran = (p, k) => (p > BATAS ? (k > BATAS ? "kp" : "ks") : (k > BATAS ? "ki" : "mo"));
+
+// Garis tengah dan nama kuadran pada latar grafik, serta label titik.
+const latar = { id: "latar", afterDatasetsDraw(c) {
+  const g = c.ctx, { left, right, top, bottom } = c.chartArea;
+  const xm = c.scales.x.getPixelForValue(BATAS), ym = c.scales.y.getPixelForValue(BATAS);
+  g.save(); g.strokeStyle = "#7f8c8d"; g.setLineDash([4, 4]);
+  g.beginPath(); g.moveTo(xm, top); g.lineTo(xm, bottom); g.moveTo(left, ym); g.lineTo(right, ym); g.stroke();
+  g.setLineDash([]); g.font = "600 12px " + Chart.defaults.font.family; g.globalAlpha = 0.6; g.fillStyle = Chart.defaults.color;
+  g.textAlign = "right"; g.fillText("Key players", right - 6, top + 16); g.fillText("Keep informed", right - 6, bottom - 8);
+  g.textAlign = "left"; g.fillText("Keep satisfied", left + 6, top + 16); g.fillText("Monitor", left + 6, bottom - 8);
+  g.globalAlpha = 1; g.font = "11px " + Chart.defaults.font.family; g.textAlign = "left";
+  c.data.datasets[0].data.forEach((d, i) => {
+    const m = c.getDatasetMeta(0).data[i]; if (!m) return;
+    // label di bawah titik; di tepi kanan/kiri rata ke dalam agar tidak keluar grafik
+    g.textAlign = d.x >= 5 ? "right" : d.x <= 1 ? "left" : "center";
+    g.fillText(d.label, m.x + (d.x >= 5 ? 6 : d.x <= 1 ? -6 : 0), m.y + 18);
+  });
+  g.restore();
+} };
+const skalaBulat = (ax) => { ax.ticks = [1, 2, 3, 4, 5].map((value) => ({ value })); };
+const singkat = (s, n = 26) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+
+K.halaman({
+  tabs: [{ nama: "stakeholder", judul: "Daftar pemangku kepentingan", teks: ["nama", "lembaga", "peran"], tambahBaris: true }],
+  hitung({ data, el }) {
+    const esc = Studio.esc;
+    const sah = (v) => K.ada(v) && v >= 1 && v <= 5;
+    const semua = data.stakeholder.map((r) => ({ nama: String(r.nama || "").trim(), lembaga: String(r.lembaga || "").trim(), peran: String(r.peran || "").trim(),
+      p: K.angka(r.pengaruh), k: K.angka(r.kepentingan) })).filter((r) => r.nama || r.lembaga);
+    semua.forEach((r) => { r.label = r.lembaga || r.nama; });
+    const dinilai = semua.filter((r) => sah(r.p) && sah(r.k));
+    const salah = semua.filter((r) => (K.ada(r.p) && !sah(r.p)) || (K.ada(r.k) && !sah(r.k)));
+    if (!dinilai.length) {
+      el.innerHTML = K.pesanKosong("Isi skor pengaruh dan kepentingan (1–5) untuk pemangku kepentingan di tab stakeholder.");
+      return;
+    }
+    dinilai.forEach((r) => { r.q = kuadran(r.p, r.k); });
+    const jumlah = (q) => dinilai.filter((r) => r.q === q).length;
+    el.innerHTML = `
+      <div class="card blok"><h2>Pemetaan pemangku kepentingan</h2>
+        <div class="hasil-ringkas">
+          ${Object.entries(KUADRAN).map(([q, v]) => `<div><span class="small muted">${v.nama}</span><b>${jumlah(q)}</b></div>`).join("")}
+          <div><span class="small muted">Sudah dinilai</span><b>${dinilai.length} / ${semua.length}</b></div>
+        </div>
+        ${salah.length ? `<p class="small"><span class="pill bad">Skor di luar 1–5</span> ${salah.map((r) => esc(r.label)).join(", ")}</p>` : ""}
+        <div class="grafik" style="height:480px"><canvas id="g-sh"></canvas></div>
+      </div>
+      <div class="card blok"><h2>Daftar per kuadran</h2><div id="t-sh"></div></div>`;
+    const urut = [...dinilai].sort((a, b) => Object.keys(KUADRAN).indexOf(a.q) - Object.keys(KUADRAN).indexOf(b.q) || (b.p + b.k) - (a.p + a.k));
+    K.tabelHasil(document.getElementById("t-sh"), {
+      kolom: ["Pemangku kepentingan", "Nama narasumber", "Peran", "Pengaruh", "Kepentingan", "Kuadran", "Strategi pelibatan"],
+      baris: urut.map((r) => [r.lembaga, r.nama, r.peran, r.p, r.k, KUADRAN[r.q].nama, KUADRAN[r.q].saran]),
+      desimal: [0, 0, 0, 1, 1, 0, 0],
+      kelas: (v, i, j) => (j === 5 ? (v === "Key players" ? "ok" : v === "Monitor" ? "" : "warn") : ""),
+      namaFile: "matriks-stakeholder",
+      catatan: "Skor di atas 3 = tinggi.",
+    });
+    // Titik dengan skor sama digabung agar label tidak bertumpuk.
+    const grup = {};
+    dinilai.forEach((r) => { const key = `${r.k}|${r.p}`; (grup[key] = grup[key] || []).push(r); });
+    const titik = Object.values(grup).map((g) => ({ x: g[0].k, y: g[0].p, q: g[0].q,
+      label: g.length > 1 ? `${singkat(g[0].label, 16)} +${g.length - 1}` : singkat(g[0].label, 20), semua: g.map((r) => r.label) }));
+    K.grafik("g-sh", {
+      type: "scatter",
+      data: { datasets: [{ data: titik, pointRadius: 7, backgroundColor: titik.map((t) => KUADRAN[t.q].warna) }] },
+      options: {
+        plugins: { legend: { display: false }, title: { display: true, text: "Pengaruh vs kepentingan (garis putus = skor 3; skor 3 termasuk rendah)" },
+          tooltip: { callbacks: { label: (c) => `${c.raw.semua.join(", ")} · kepentingan ${c.raw.x}, pengaruh ${c.raw.y}` } } },
+        scales: { x: { min: 0.5, max: 5.5, afterBuildTicks: skalaBulat, title: { display: true, text: "Kepentingan" } },
+          y: { min: 0.5, max: 5.5, afterBuildTicks: skalaBulat, title: { display: true, text: "Pengaruh" } } },
+      },
+      plugins: [latar],
+    });
+  },
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Struktur Penduduk · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Struktur Penduduk</h1>
+    <p class="muted">Aspek Demografi · PJ Bidang Sosial, Budaya &amp; Kependudukan. Isi jumlah penduduk laki-laki dan perempuan per kelompok umur lima tahunan untuk setiap kelurahan di tab <code>penduduk_struktur</code> (sumber: BPS / Disdukcapil).</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>Rasio jenis kelamin: <code>RJK = L / P × 100</code></li>
+      <li>Rasio ketergantungan: <code>RK = (penduduk 0–14 + penduduk ≥ 65) / penduduk 15–64 × 100</code>, dirinci menjadi ketergantungan muda (0–14) dan tua (≥ 65).</li>
+      <li>Piramida penduduk per kelompok umur lima tahunan, untuk kecamatan atau satu kelurahan.</li>
+    </ul>
+    <p>Sumber metode: proposal Bab 3.3.2 (aspek demografi dan kependudukan).</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+const MUDA = ["0-4", "5-9", "10-14"], TUA = ["65-69", "70-74", "75+"];
+const norm = (u) => String(u || "").replace(/\s|tahun/gi, "").replace(/[–—]/g, "-").replace(/>=?|≥/, "").replace(/\+$/, "+");
+let pilihan = "Kecamatan Ampenan";
+K.halaman({
+  tabs: [{ nama: "penduduk_struktur", judul: "Penduduk per kelompok umur dan jenis kelamin", kunci: ["kelurahan", "kelompok_umur"] }],
+  param: [],
+  hitung({ data, el }) {
+    const rows = data.penduduk_struktur;
+    const isi = K.statusIsi(rows, ["laki_laki", "perempuan"]);
+    if (!isi.isi) {
+      el.innerHTML = K.pesanKosong("Isi jumlah laki-laki dan perempuan per kelompok umur di tab penduduk_struktur.");
+      return;
+    }
+    const umur = [...new Set(rows.map((r) => r.kelompok_umur))];
+    const kelList = [...new Set(rows.map((r) => r.kelurahan))];
+    const rekap = (filter) => {
+      const g = rows.filter(filter);
+      const sum = (f) => g.reduce((a, r) => a + (K.ada(f(r)) ? f(r) : 0), 0);
+      const L = sum((r) => K.angka(r.laki_laki)), P = sum((r) => K.angka(r.perempuan));
+      const kel = (daftar) => sum((r) => (daftar.includes(norm(r.kelompok_umur)) ? K.angka(r.laki_laki) + (K.angka(r.perempuan) || 0) : NaN));
+      const muda = kel(MUDA), tua = kel(TUA), total = L + P, prod = total - muda - tua;
+      const lengkap = g.every((r) => K.ada(K.angka(r.laki_laki)) && K.ada(K.angka(r.perempuan)));
+      return { L, P, total, muda, tua, prod, lengkap,
+        rjk: P ? (L / P) * 100 : NaN, rk: prod ? ((muda + tua) / prod) * 100 : NaN,
+        rkm: prod ? (muda / prod) * 100 : NaN, rkt: prod ? (tua / prod) * 100 : NaN };
+    };
+    const per = kelList.map((k) => ({ k, ...rekap((r) => r.kelurahan === k) }));
+    const kec = rekap(() => true);
+    el.innerHTML = `
+      <div class="card blok"><h2>Indikator struktur penduduk</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Jumlah penduduk</span><b>${K.fmt(kec.total)}</b></div>
+          <div><span class="small muted">Rasio jenis kelamin</span><b>${K.fmt(kec.rjk, 1)}</b></div>
+          <div><span class="small muted">Rasio ketergantungan</span><b>${K.fmt(kec.rk, 1)}</b></div>
+          <div><span class="small muted">Sel terisi</span><b>${isi.isi} / ${isi.total}</b></div>
+        </div>
+        <div id="t-hasil"></div>
+      </div>
+      <div class="card blok"><h2>Piramida penduduk</h2>
+        <div class="filters"><select id="pilih-kel">${["Kecamatan Ampenan", ...kelList].map((k) => `<option${k === pilihan ? " selected" : ""}>${Studio.esc(k)}</option>`).join("")}</select></div>
+        <div class="grafik" style="height:420px"><canvas id="g-piramida"></canvas></div>
+      </div>`;
+    const baris = [...per, { k: "Kecamatan Ampenan", ...kec }].map((r) => [r.k, r.L, r.P, r.total, r.muda, r.prod, r.tua, r.rjk, r.rkm, r.rkt, r.rk, r.lengkap ? "Lengkap" : "Belum lengkap"]);
+    K.tabelHasil(document.getElementById("t-hasil"), {
+      kolom: ["Kelurahan", "Laki-laki", "Perempuan", "Jumlah", "0–14", "15–64", "≥ 65", "Rasio jenis kelamin", "Ketergantungan muda", "Ketergantungan tua", "Rasio ketergantungan", "Isian"],
+      baris, desimal: [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0], namaFile: "struktur-penduduk",
+      kelas: (v, i, j) => (j === 11 && v !== "Lengkap" ? "warn" : ""),
+      catatan: "Kelurahan yang isiannya belum lengkap dihitung dari sel yang sudah terisi saja.",
+    });
+    const gambar = () => {
+      const f = pilihan === "Kecamatan Ampenan" ? () => true : (r) => r.kelurahan === pilihan;
+      const jml = (u, kol) => rows.filter((r) => f(r) && r.kelompok_umur === u).reduce((a, r) => a + (K.angka(r[kol]) || 0), 0);
+      const label = [...umur].reverse();
+      K.grafik("g-piramida", {
+        type: "bar",
+        data: { labels: label, datasets: [
+          { label: "Laki-laki", data: label.map((u) => -jml(u, "laki_laki")), backgroundColor: K.WARNA[2] },
+          { label: "Perempuan", data: label.map((u) => jml(u, "perempuan")), backgroundColor: K.WARNA[1] },
+        ] },
+        options: {
+          indexAxis: "y",
+          scales: { x: { stacked: true, ticks: { callback: (v) => K.fmt(Math.abs(v)) } }, y: { stacked: true } },
+          plugins: { legend: { position: "bottom" }, title: { display: true, text: `Piramida penduduk ${pilihan}` },
+            tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${K.fmt(Math.abs(c.raw))}` } } },
+        },
+      });
+    };
+    document.getElementById("pilih-kel").onchange = (e) => { pilihan = e.target.value; gambar(); };
+    gambar();
+  },
+}).then(() => {
+  // Tabel input 160 baris: dilipat bila sudah ada isinya supaya hasil langsung terlihat.
+  const blok = document.querySelector("#kalkulator details.blok");
+  if (blok && document.querySelector("#k-in-0 input[value]:not([value=''])")) blok.removeAttribute("open");
+});
+</script>
+</body>
+</html>

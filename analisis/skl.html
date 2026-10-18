@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Satuan Kemampuan Lahan · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Satuan Kemampuan Lahan (SKL)</h1>
+    <p class="muted">Aspek Fisik &amp; Lingkungan · PJ Bidang Fisik &amp; Lingkungan bersama Bidang Kebencanaan. Isi nilai 1–5 untuk 9 SKL tiap satuan lahan (hasil olah layer di QGIS) beserta luasnya di tab <code>skl</code>. Satu baris = satu satuan lahan; tambah baris bila satu kelurahan punya beberapa satuan lahan.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <p>Skor total = Σ (nilai SKL × bobot). Nilai tiap SKL 1 (rendah) sampai 5 (tinggi). Bobot: morfologi 5, kemudahan dikerjakan 1, kestabilan lereng 5, kestabilan pondasi 3, ketersediaan air 5, drainase 5, erosi 3, pembuangan limbah 0, bencana alam 5 (jumlah 32, sehingga skor berkisar 32–160).</p>
+    <p>Kelas kemampuan pengembangan: 32–58 sangat rendah (kelas a), 59–83 rendah (b), 84–109 sedang (c), 110–134 agak tinggi (d), 135–160 sangat tinggi (e).</p>
+    <p class="small muted">Sumber: Permen PU No. 20/PRT/M/2007 tentang Pedoman Teknis Analisis Aspek Fisik &amp; Lingkungan, Ekonomi, serta Sosial Budaya dalam Penyusunan RTR; proposal Bab 3.3 (aspek fisik). Pembobotan SKL pembuangan limbah bernilai 0 sesuai pedoman.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+const SKL = [
+  ["skl_morfologi", "Morfologi", 5],
+  ["skl_kemudahan_dikerjakan", "Kemudahan dikerjakan", 1],
+  ["skl_kestabilan_lereng", "Kestabilan lereng", 5],
+  ["skl_kestabilan_pondasi", "Kestabilan pondasi", 3],
+  ["skl_ketersediaan_air", "Ketersediaan air", 5],
+  ["skl_drainase", "Drainase", 5],
+  ["skl_erosi", "Erosi", 3],
+  ["skl_pembuangan_limbah", "Pembuangan limbah", 0],
+  ["skl_bencana_alam", "Bencana alam", 5],
+];
+const KELAS = [
+  [32, 58, "a", "Sangat rendah"], [59, 83, "b", "Rendah"], [84, 109, "c", "Sedang"],
+  [110, 134, "d", "Agak tinggi"], [135, 160, "e", "Sangat tinggi"],
+];
+const WARNA_KELAS = ["#d73027", "#fc8d59", "#fee08b", "#91cf60", "#1a9850"];
+// Kelas ditentukan dari batas bawah kelas berikutnya (skor pecahan tetap masuk satu kelas).
+const kelasDari = (s) => { const i = KELAS.findIndex(([bawah]) => s < bawah); return i === -1 ? KELAS.length - 1 : Math.max(0, i - 1); };
+
+K.halaman({
+  tabs: [{ nama: "skl", judul: "Nilai 9 SKL per satuan lahan", teks: ["satuan_lahan", "kelurahan"], tambahBaris: true }],
+  hitung({ data, el }) {
+    const rows = data.skl.map((r, i) => {
+      const nilai = SKL.map(([k]) => K.angka(r[k]));
+      const lengkap = nilai.every((v) => K.ada(v));
+      const salah = nilai.some((v) => K.ada(v) && (v < 1 || v > 5));
+      const skor = lengkap ? nilai.reduce((a, v, j) => a + v * SKL[j][2], 0) : NaN;
+      const k = lengkap && !salah ? kelasDari(skor) : -1;
+      return { nama: r.satuan_lahan || `Baris ${i + 1}`, kel: r.kelurahan || "", nilai, lengkap, salah, skor, k, luas: K.angka(r.luas_ha) };
+    });
+    const siap = rows.filter((r) => r.lengkap && !r.salah);
+    if (!siap.length) {
+      el.innerHTML = K.pesanKosong("Isi nilai 1–5 untuk kesembilan SKL pada minimal satu satuan lahan di tab skl.");
+      return;
+    }
+    const luasKelas = KELAS.map((_, i) => siap.filter((r) => r.k === i).reduce((a, r) => a + (K.ada(r.luas) ? r.luas : 0), 0));
+    const totLuas = luasKelas.reduce((a, b) => a + b, 0);
+    const kelurahan = K.KELURAHAN.filter((n) => siap.some((r) => r.kel === n));
+    el.innerHTML = `
+      <div class="card blok"><h2>Skor dan kelas kemampuan lahan per satuan lahan</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Satuan lahan dihitung</span><b>${siap.length} / ${rows.length}</b></div>
+          <div><span class="small muted">Luas terhitung</span><b>${K.fmt(totLuas, 2)} ha</b></div>
+          ${rows.some((r) => r.salah) ? '<div><span class="small muted">Perlu dicek</span><b class="pill bad">Ada nilai di luar 1–5</b></div>' : ""}
+        </div>
+        <div id="t-skl"></div></div>
+      <div class="card blok"><h2>Luas per kelas kemampuan pengembangan</h2><div id="t-kelas"></div>
+        <div class="grafik"><canvas id="g-kelas"></canvas></div></div>`;
+    K.tabelHasil(document.getElementById("t-skl"), {
+      kolom: ["Satuan lahan", "Kelurahan", ...SKL.map(([, n, b]) => `${n} (×${b})`), "Skor total", "Kelas", "Kemampuan", "Luas (ha)"],
+      baris: rows.map((r) => [r.nama, r.kel, ...r.nilai, r.skor,
+        r.salah ? "nilai salah" : r.k >= 0 ? KELAS[r.k][2] : "belum lengkap", r.k >= 0 ? KELAS[r.k][3] : "", r.luas]),
+      desimal: [0, 0, ...SKL.map(() => 0), 1, 0, 0, 2],
+      kelas: (v, i, j) => (j === 2 + SKL.length + 1 && (v === "nilai salah" || v === "belum lengkap") ? "warn" : ""),
+      namaFile: "skl-satuan-lahan",
+    });
+    const baris = KELAS.map(([a, b, kode, nama], i) => {
+      const perKel = kelurahan.map((n) => siap.filter((r) => r.kel === n && r.k === i).reduce((s, r) => s + (K.ada(r.luas) ? r.luas : 0), 0));
+      return [`${kode} · ${nama}`, `${a}–${b}`, ...perKel, luasKelas[i], totLuas ? (luasKelas[i] / totLuas) * 100 : NaN];
+    });
+    K.tabelHasil(document.getElementById("t-kelas"), {
+      kolom: ["Kelas", "Rentang skor", ...kelurahan.map((n) => `${n} (ha)`), "Total (ha)", "Total (%)"],
+      baris: [...baris, ["Jumlah", "", ...kelurahan.map((_, j) => baris.reduce((a, b) => a + b[2 + j], 0)), totLuas, 100]],
+      desimal: [0, 0, ...kelurahan.map(() => 2), 2, 1],
+      namaFile: "skl-luas-per-kelas",
+      catatan: "Luas hanya dari satuan lahan yang kesembilan nilainya lengkap.",
+    });
+    K.grafik("g-kelas", {
+      type: "bar",
+      data: { labels: kelurahan, datasets: KELAS.map(([, , kode, nama], i) => ({ label: `${kode} · ${nama}`, data: kelurahan.map((n) => baris[i][2 + kelurahan.indexOf(n)]), backgroundColor: WARNA_KELAS[i] })) },
+      options: { scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: "ha" } } }, plugins: { legend: { position: "bottom" }, title: { display: true, text: "Luas kelas kemampuan lahan per kelurahan" } } },
+    });
+  },
+});
+</script>
+</body>
+</html>

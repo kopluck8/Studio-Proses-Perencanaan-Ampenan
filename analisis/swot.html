@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IFAS/EFAS &amp; Kuadran SWOT · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>IFAS/EFAS &amp; Kuadran SWOT</h1>
+    <p class="muted">Tahap 4 · PJ Koordinator bersama semua bidang. Isi faktor S, W, O, T beserta bobot, rating, dan buktinya di tab <code>swot</code>.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>Setiap faktor diberi <b>bobot</b> (total S + W = 1,00 untuk IFAS; total O + T = 1,00 untuk EFAS) dan <b>rating</b> 1–4.</li>
+      <li><code>Skor = bobot × rating</code>; skor S, W, O, T adalah jumlah skor faktornya.</li>
+      <li>Posisi kuadran: <code>x = S − W</code>, <code>y = O − T</code>. Kuadran I (x ≥ 0, y ≥ 0) agresif/SO, II (x ≥ 0, y &lt; 0) diversifikasi/ST, III (x &lt; 0, y ≥ 0) turn-around/WO, IV (x &lt; 0, y &lt; 0) defensif/WT.</li>
+    </ul>
+    <p>Kolom <b>bukti</b> diisi dengan hasil analisis yang mendasari faktor (misalnya defisit RTH atau luas mismatch di suatu kelurahan), sesuai pendekatan SWOT berbasis bukti spasial di proposal Tahap 4. Kolom kelurahan/zona menunjukkan lokasi strategi.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+const NAMA = { S: "Kekuatan (S)", W: "Kelemahan (W)", O: "Peluang (O)", T: "Ancaman (T)" };
+const KUADRAN = {
+  I: ["Kuadran I · Agresif (SO)", "Gunakan kekuatan untuk memanfaatkan peluang."],
+  II: ["Kuadran II · Diversifikasi (ST)", "Gunakan kekuatan untuk menghadapi ancaman."],
+  III: ["Kuadran III · Turn-around (WO)", "Benahi kelemahan dengan memanfaatkan peluang."],
+  IV: ["Kuadran IV · Defensif (WT)", "Kurangi kelemahan sambil menghindari ancaman."],
+};
+// Plugin Chart.js: garis sumbu tengah dan label kuadran.
+const labelKuadran = {
+  id: "labelKuadran",
+  beforeDatasetsDraw(chart) {
+    const { ctx, chartArea: a, scales: { x, y } } = chart;
+    const x0 = x.getPixelForValue(0), y0 = y.getPixelForValue(0);
+    ctx.save();
+    ctx.strokeStyle = Chart.defaults.color; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x0, a.top); ctx.lineTo(x0, a.bottom); ctx.moveTo(a.left, y0); ctx.lineTo(a.right, y0); ctx.stroke();
+    ctx.fillStyle = Chart.defaults.color; ctx.font = "12px " + Chart.defaults.font.family;
+    ctx.textAlign = "right"; ctx.fillText("I · Agresif (SO)", a.right - 6, a.top + 16); ctx.fillText("II · Diversifikasi (ST)", a.right - 6, a.bottom - 8);
+    ctx.textAlign = "left"; ctx.fillText("III · Turn-around (WO)", a.left + 6, a.top + 16); ctx.fillText("IV · Defensif (WT)", a.left + 6, a.bottom - 8);
+    ctx.restore();
+  },
+};
+K.halaman({
+  tabs: [{ nama: "swot", judul: "Faktor SWOT, bobot, rating, dan bukti", teks: ["jenis", "faktor", "bukti", "kelurahan"], tambahBaris: true }],
+  hitung({ data, el }) {
+    const faktor = data.swot.map((r) => ({
+      ...r, j: String(r.jenis || "").trim().toUpperCase().charAt(0), bobot: K.angka(r.bobot), rating: K.angka(r.rating),
+    })).filter((r) => NAMA[r.j] && String(r.faktor || "").trim());
+    faktor.forEach((f) => { f.skor = K.ada(f.bobot) && K.ada(f.rating) ? f.bobot * f.rating : NaN; });
+    if (!faktor.length) {
+      el.innerHTML = K.pesanKosong("Isi faktor di tab swot: kolom jenis (S, W, O, atau T), faktor, bobot (total S+W = 1,00 dan O+T = 1,00), rating 1–4, dan bukti (hasil kalkulator lain atau peta).");
+      return;
+    }
+    const tot = (j, k) => faktor.filter((f) => f.j === j && K.ada(f[k])).reduce((a, f) => a + f[k], 0);
+    const skor = Object.fromEntries("SWOT".split("").map((j) => [j, tot(j, "skor")]));
+    const bobotIFAS = tot("S", "bobot") + tot("W", "bobot"), bobotEFAS = tot("O", "bobot") + tot("T", "bobot");
+    const x = skor.S - skor.W, y = skor.O - skor.T;
+    const kd = x >= 0 ? (y >= 0 ? "I" : "II") : (y >= 0 ? "III" : "IV");
+
+    const peringatan = [];
+    const cekBobot = (nilai, nama) => { if (Math.abs(nilai - 1) > 0.005) peringatan.push(`Total bobot ${nama} = ${K.fmt(nilai, 2)}, seharusnya 1,00.`); };
+    cekBobot(bobotIFAS, "IFAS (S + W)"); cekBobot(bobotEFAS, "EFAS (O + T)");
+    const salahRating = faktor.filter((f) => !(f.rating >= 1 && f.rating <= 4));
+    if (salahRating.length) peringatan.push(`${salahRating.length} faktor belum punya rating 1–4: ${salahRating.map((f) => Studio.esc(f.faktor)).join(", ")}.`);
+    const tanpaBukti = faktor.filter((f) => !String(f.bukti || "").trim()).length;
+    if (tanpaBukti) peringatan.push(`${tanpaBukti} faktor belum mencantumkan bukti.`);
+
+    el.innerHTML = `
+      <div class="card blok"><h2>Posisi strategi</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Skor IFAS (S − W)</span><b>${K.fmt(x, 2)}</b><span class="small muted">S ${K.fmt(skor.S, 2)} · W ${K.fmt(skor.W, 2)}</span></div>
+          <div><span class="small muted">Skor EFAS (O − T)</span><b>${K.fmt(y, 2)}</b><span class="small muted">O ${K.fmt(skor.O, 2)} · T ${K.fmt(skor.T, 2)}</span></div>
+          <div><span class="small muted">Strategi utama</span><b>${KUADRAN[kd][0]}</b><span class="small muted">${KUADRAN[kd][1]}</span></div>
+        </div>
+        ${peringatan.map((p) => `<p class="small"><span class="pill warn">Periksa</span> ${p}</p>`).join("")}
+        <div class="grafik"><canvas id="g-swot"></canvas></div>
+      </div>
+      <div class="card blok"><h2>Matriks IFAS</h2><div id="t-ifas"></div></div>
+      <div class="card blok"><h2>Matriks EFAS</h2><div id="t-efas"></div></div>`;
+
+    const matriks = (id, jenisPair, nama) => {
+      const baris = [];
+      jenisPair.forEach((j) => {
+        faktor.filter((f) => f.j === j).forEach((f) => baris.push([NAMA[j], f.faktor, f.bobot, f.rating, f.skor, f.bukti || "", f.kelurahan || ""]));
+        baris.push([`Subtotal ${NAMA[j]}`, "", tot(j, "bobot"), "", skor[j], "", ""]);
+      });
+      baris.push([`Total ${nama}`, "", tot(jenisPair[0], "bobot") + tot(jenisPair[1], "bobot"), "", skor[jenisPair[0]] - skor[jenisPair[1]], `selisih ${jenisPair[0]} − ${jenisPair[1]}`, ""]);
+      K.tabelHasil(document.getElementById(id), {
+        kolom: ["Jenis", "Faktor", "Bobot", "Rating", "Skor", "Bukti", "Kelurahan/zona"],
+        baris, desimal: [0, 0, 2, 0, 2, 0, 0], namaFile: nama.toLowerCase(),
+        kelas: (v, i, j) => (j === 2 && /^Total/.test(baris[i][0]) && Math.abs(v - 1) > 0.005 ? "warn" : ""),
+        catatan: "Skor = bobot × rating.",
+      });
+    };
+    matriks("t-ifas", ["S", "W"], "IFAS");
+    matriks("t-efas", ["O", "T"], "EFAS");
+
+    const batas = Math.max(1, Math.abs(x), Math.abs(y)) * 1.25;
+    K.grafik("g-swot", {
+      type: "scatter",
+      data: { datasets: [{ label: "Posisi wilayah studi", data: [{ x, y }], backgroundColor: "#d7301f", pointRadius: 8 }] },
+      options: {
+        scales: {
+          x: { min: -batas, max: batas, title: { display: true, text: "Faktor internal (S − W)" } },
+          y: { min: -batas, max: batas, title: { display: true, text: "Faktor eksternal (O − T)" } },
+        },
+        plugins: { legend: { display: false }, title: { display: true, text: "Diagram kuadran SWOT" },
+          tooltip: { callbacks: { label: (c) => `S−W ${K.fmt(c.parsed.x, 2)}, O−T ${K.fmt(c.parsed.y, 2)}` } } },
+      },
+      plugins: [labelKuadran],
+    });
+  },
+});
+</script>
+</body>
+</html>

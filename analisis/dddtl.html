@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daya Dukung dan Daya Tampung Lahan Permukiman · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Daya Dukung dan Daya Tampung Lahan Permukiman</h1>
+    <p class="muted">Aspek Fisik &amp; Lingkungan · PJ Bidang Fisik &amp; Lingkungan. Memakai luas lahan permukiman (kolom <code>lahan_permukiman_ha</code> di tab <code>kelurahan</code>) dan proyeksi penduduk dari tab <code>penduduk_seri</code>.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <ul>
+      <li>Daya dukung permukiman: <code>DDPm = LPm / (JP × α)</code></li>
+      <li>Daya tampung permukiman: <code>DTPm = LPm / α</code> (jiwa)</li>
+      <li>LPm = luas lahan permukiman (m²), JP = jumlah penduduk, α = kebutuhan lahan permukiman per kapita (awal 26 m²/kapita)</li>
+      <li>Status: DDPm &gt; 1 mampu menampung, DDPm = 1 optimal, DDPm &lt; 1 terlampaui (tidak mampu menampung)</li>
+    </ul>
+    <p>Dihitung untuk tahun data terakhir dan setiap tahun proyeksi. Sumber metode: proposal Bab 3.3.2 (aspek fisik dan lingkungan). Nilai α dapat diubah di tab <code>parameter</code>.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+const status = (d) => (!K.ada(d) ? "–" : d > 1.0005 ? "Mampu" : d >= 0.9995 ? "Optimal" : "Terlampaui");
+K.halaman({
+  tabs: [
+    { nama: "kelurahan", judul: "Lahan permukiman per kelurahan", kunci: ["kelurahan"] },
+    { nama: "penduduk_seri", judul: "Jumlah penduduk per tahun", kunci: ["kelurahan"] },
+  ],
+  param: ["tahun_proyeksi", "metode_proyeksi", "laju_proyeksi", "dddtl_alfa"],
+  hitung({ data, p, el }) {
+    const alfa = p.dddtl_alfa ?? 26;
+    const lahan = {};
+    data.kelurahan.forEach((r) => { lahan[r.kelurahan] = K.angka(r.lahan_permukiman_ha); });
+    const pr = K.proyeksi(data.penduduk_seri, p);
+    const siap = pr.hasil.filter((h) => h.metode && K.ada(lahan[h.kelurahan]));
+    if (!siap.length) {
+      const kurang = [];
+      if (!Object.values(lahan).some(K.ada)) kurang.push("luas lahan permukiman (kolom lahan_permukiman_ha di tab kelurahan)");
+      if (!pr.hasil.some((h) => h.metode)) kurang.push("minimal dua tahun data penduduk di tab penduduk_seri");
+      el.innerHTML = K.pesanKosong(`Isi ${kurang.join(" dan ") || "data penduduk dan lahan permukiman untuk kelurahan yang sama"}.`);
+      return;
+    }
+    const tahunDasar = Math.max(...siap.map((h) => h.tahunDasar));
+    const tahunSemua = [tahunDasar, ...pr.target.filter((t) => t > tahunDasar)];
+    const nilaiP = (h, t) => (t === h.tahunDasar ? h.dasar : h.nilai[t]);
+    const dd = (L, P) => (L * 10000) / (P * alfa);
+    const baris = siap.map((h) => {
+      const L = lahan[h.kelurahan];
+      return [h.kelurahan, L, (L * 10000) / alfa, ...tahunSemua.map((t) => dd(L, nilaiP(h, t))), status(dd(L, nilaiP(h, tahunSemua[tahunSemua.length - 1])))];
+    });
+    const sL = siap.reduce((a, h) => a + lahan[h.kelurahan], 0);
+    const sP = (t) => siap.reduce((a, h) => a + nilaiP(h, t), 0);
+    const akhir = tahunSemua[tahunSemua.length - 1];
+    baris.push(["Kecamatan Ampenan*", sL, (sL * 10000) / alfa, ...tahunSemua.map((t) => dd(sL, sP(t))), status(dd(sL, sP(akhir)))]);
+    const nTerlampaui = siap.filter((h) => dd(lahan[h.kelurahan], nilaiP(h, akhir)) < 0.9995).length;
+    el.innerHTML = `
+      <div class="card blok"><h2>Hasil daya dukung dan daya tampung</h2>
+        <div class="hasil-ringkas">
+          <div><span class="small muted">Daya tampung kecamatan*</span><b>${K.fmt((sL * 10000) / alfa)} jiwa</b></div>
+          <div><span class="small muted">Penduduk ${akhir}*</span><b>${K.fmt(sP(akhir))} jiwa</b></div>
+          <div><span class="small muted">Kelurahan terlampaui ${akhir}</span><b>${nTerlampaui} / ${siap.length}</b></div>
+        </div>
+        <div id="t-hasil"></div>
+        <div class="grafik"><canvas id="g-dddtl"></canvas></div>
+      </div>`;
+    const nT = tahunSemua.length;
+    K.tabelHasil(document.getElementById("t-hasil"), {
+      kolom: ["Kelurahan", "Lahan permukiman (ha)", "Daya tampung (jiwa)", ...tahunSemua.map((t) => `DDPm ${t}${t === tahunDasar ? " (eksisting)" : ""}`), `Status ${akhir}`],
+      baris, desimal: [0, 2, 0, ...tahunSemua.map(() => 2), 0], namaFile: "dddtl-permukiman",
+      kelas: (v, i, j) => (j >= 3 && j < 3 + nT && K.ada(v) ? (v < 0.9995 ? "bad" : "ok") : j === 3 + nT ? ({ Terlampaui: "bad", Mampu: "ok" }[v] || "") : ""),
+      catatan: "* Hanya kelurahan yang data penduduk dan lahan permukimannya sudah terisi. DDPm < 1 berarti jumlah penduduk melebihi daya tampung lahan permukiman.",
+    });
+    K.grafik("g-dddtl", {
+      type: "bar",
+      data: { labels: siap.map((h) => h.kelurahan), datasets: [
+        { label: `Penduduk ${tahunDasar}`, data: siap.map((h) => h.dasar), backgroundColor: K.WARNA[0] },
+        ...(akhir !== tahunDasar ? [{ label: `Penduduk ${akhir}`, data: siap.map((h) => nilaiP(h, akhir)), backgroundColor: K.WARNA[3] }] : []),
+        { type: "line", label: "Daya tampung", data: siap.map((h) => (lahan[h.kelurahan] * 10000) / alfa), borderColor: K.WARNA[1], backgroundColor: K.WARNA[1], showLine: false, pointStyle: "line", pointRadius: 14, pointBorderWidth: 3 },
+      ] },
+      options: { plugins: { legend: { position: "bottom" }, title: { display: true, text: "Jumlah penduduk dibanding daya tampung lahan permukiman (jiwa)" } } },
+    });
+  },
+});
+</script>
+</body>
+</html>

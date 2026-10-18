@@ -5,18 +5,66 @@
     "jadwal": "",
     "tugas": "",
     "kebutuhan_data": "",
-    "survei_foto": ""
+    "survei_foto": "",
+    "ahp_responden": "",
+    "anggaran": "",
+    "bencana": "",
+    "cagar_budaya": "",
+    "ekonomi_meta": "",
+    "ekonomi_sektor": "",
+    "kelurahan": "",
+    "lahan": "",
+    "lahan_meta": "",
+    "mismatch": "",
+    "parameter": "",
+    "penduduk_seri": "",
+    "penduduk_struktur": "",
+    "rth": "",
+    "sarana_eksisting": "",
+    "skl": "",
+    "stakeholder": "",
+    "standar_sarana": "",
+    "swot": "",
+    "wlc_layer": "",
+    "zonasi_wlc": ""
   },
   "tanggal_presentasi_akhir": "2026-11-22",
   "kategori_survei": [
-    {"nama": "Cagar Budaya", "warna": "#8e44ad"},
-    {"nama": "Sempadan Alam", "warna": "#1f78b4"},
-    {"nama": "Rawan Bencana", "warna": "#d7301f"},
-    {"nama": "Permukiman Kumuh & KDB", "warna": "#e6850e"},
-    {"nama": "Alih Fungsi KP2B", "warna": "#33a02c"},
-    {"nama": "Sarana", "warna": "#0b8a8a"},
-    {"nama": "Prasarana", "warna": "#6a5acd"},
-    {"nama": "Ekonomi & UMKM", "warna": "#b8860b"},
-    {"nama": "Lainnya", "warna": "#7f8c8d"}
+    {
+      "nama": "Cagar Budaya",
+      "warna": "#8e44ad"
+    },
+    {
+      "nama": "Sempadan Alam",
+      "warna": "#1f78b4"
+    },
+    {
+      "nama": "Rawan Bencana",
+      "warna": "#d7301f"
+    },
+    {
+      "nama": "Permukiman Kumuh & KDB",
+      "warna": "#e6850e"
+    },
+    {
+      "nama": "Alih Fungsi KP2B",
+      "warna": "#33a02c"
+    },
+    {
+      "nama": "Sarana",
+      "warna": "#0b8a8a"
+    },
+    {
+      "nama": "Prasarana",
+      "warna": "#6a5acd"
+    },
+    {
+      "nama": "Ekonomi & UMKM",
+      "warna": "#b8860b"
+    },
+    {
+      "nama": "Lainnya",
+      "warna": "#7f8c8d"
+    }
   ]
 }
