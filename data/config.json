@@ -1,7 +1,7 @@
 {
   "judul": "Studio Proses Perencanaan Kecamatan Ampenan",
   "_petunjuk_google_sheets": "Isi google_sheets_id dengan ID spreadsheet (menu Dashboard Studio → Tampilkan ID, dari apps-script/Kode.gs). Semua tab dibaca otomatis. google_sheets hanya untuk mengganti sumber satu tab dengan URL CSV lain; biarkan kosong.",
-  "google_sheets_id": "",
+  "google_sheets_id": "1HkCApfdFTBw_9PUXACgAsVMwIrbEA7PgwVVKozuyVIg",
   "google_sheets": {},
   "tanggal_presentasi_akhir": "2026-11-22",
   "kategori_survei": [
