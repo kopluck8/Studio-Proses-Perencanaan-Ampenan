@@ -1,18 +1,18 @@
 sektor,wilayah_awal,wilayah_akhir,pembanding_awal,pembanding_akhir
-"A. Pertanian, Kehutanan, dan Perikanan",,,,
-B. Pertambangan dan Penggalian,,,,
-C. Industri Pengolahan,,,,
-D. Pengadaan Listrik dan Gas,,,,
-"E. Pengadaan Air, Pengelolaan Sampah, Limbah dan Daur Ulang",,,,
-F. Konstruksi,,,,
-G. Perdagangan Besar dan Eceran; Reparasi Mobil dan Sepeda Motor,,,,
-H. Transportasi dan Pergudangan,,,,
-I. Penyediaan Akomodasi dan Makan Minum,,,,
-J. Informasi dan Komunikasi,,,,
-K. Jasa Keuangan dan Asuransi,,,,
-L. Real Estat,,,,
-"M,N. Jasa Perusahaan",,,,
-"O. Administrasi Pemerintahan, Pertahanan dan Jaminan Sosial Wajib",,,,
-P. Jasa Pendidikan,,,,
-Q. Jasa Kesehatan dan Kegiatan Sosial,,,,
-"R,S,T,U. Jasa Lainnya",,,,
+"A. Pertanian, Kehutanan, dan Perikanan",,,494520,535240
+B. Pertambangan dan Penggalian,,,740,790
+C. Industri Pengolahan,,,1347560,1617470
+D. Pengadaan Listrik dan Gas,,,16980,24590
+"E. Pengadaan Air, Pengelolaan Sampah, Limbah dan Daur Ulang",,,23190,23950
+F. Konstruksi,,,1223520,1560270
+G. Perdagangan Besar dan Eceran; Reparasi Mobil dan Sepeda Motor,,,2574200,3352250
+H. Transportasi dan Pergudangan,,,572780,753560
+I. Penyediaan Akomodasi dan Makan Minum,,,137060,227190
+J. Informasi dan Komunikasi,,,1147700,1392530
+K. Jasa Keuangan dan Asuransi,,,1499080,1686120
+L. Real Estat,,,688080,818480
+"M,N. Jasa Perusahaan",,,58700,76800
+"O. Administrasi Pemerintahan, Pertahanan dan Jaminan Sosial Wajib",,,873910,940800
+P. Jasa Pendidikan,,,1116780,1308220
+Q. Jasa Kesehatan dan Kegiatan Sosial,,,635250,827130
+"R,S,T,U. Jasa Lainnya",,,639690,862150

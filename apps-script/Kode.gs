@@ -456,6 +456,35 @@ function sesuaikanEstimasiPdrb() {
   tambahBaris('ekonomi_meta', ['variabel', 'tahun_awal', 'tahun_akhir']);
   tambahBaris('parameter');
 
+  // Isi sel yang masih kosong (atau masih berisi angka bawaan versi sebelumnya) dari salinan repo.
+  const isiDariSeed = (nama, kolom, lama) => {
+    const sh = ss.getSheetByName(nama);
+    if (!sh || sh.getLastRow() < 2) return;
+    const res = UrlFetchApp.fetch(REPO_RAW + nama + '.csv', { muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return;
+    const repo = Utilities.parseCsv(res.getContentText('UTF-8'));
+    const kRepo = repo[0];
+    const peta = {};
+    repo.slice(1).forEach((r) => { peta[String(r[0]).trim()] = r; });
+    const nilai = sh.getDataRange().getValues();
+    const kepala = nilai[0].map(String);
+    let n = 0;
+    nilai.slice(1).forEach((r, i) => {
+      const sumber = peta[String(r[0]).trim()];
+      if (!sumber) return;
+      kolom.forEach((k) => {
+        const c = kepala.indexOf(k), j = kRepo.indexOf(k);
+        if (c < 0 || j < 0 || sumber[j] === '') return;
+        const isi = String(r[c]).trim();
+        if (isi === '' || (lama && lama.indexOf(isi) >= 0)) { sh.getRange(i + 2, c + 1).setNumberFormat('@').setValue(sumber[j]); n++; }
+      });
+    });
+    if (n) catatan.push(nama + ': ' + n + ' sel diisi dari data BPS');
+  };
+  isiDariSeed('ekonomi_sektor', ['pembanding_awal', 'pembanding_akhir']);
+  isiDariSeed('pdrb_kecamatan', ['penduduk_awal', 'penduduk_akhir'], ['91311', '69261', '79132', '71662', '60816', '68965']);
+  isiDariSeed('ekonomi_meta', ['nilai'], ['2023', 'PDRB / tenaga kerja / unit usaha (pilih satu)']);
+
   // Kebutuhan data ekonomi: perbarui EK-01/EK-02 dan tambah EK-06..EK-08 (kolom kondisi dan ceklis tidak diubah).
   const kd = ss.getSheetByName('kebutuhan_data');
   const res = UrlFetchApp.fetch(REPO_RAW + 'kebutuhan_data.csv', { muteHttpExceptions: true });
