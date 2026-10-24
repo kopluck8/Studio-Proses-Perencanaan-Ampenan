@@ -65,10 +65,10 @@ Semua tab di bawah dibuat otomatis oleh Apps Script (langkah 2). Daftar tab dan 
 
 | Tab | Diisi bidang | Dipakai kalkulator |
 |---|---|---|
-| `kelurahan` | Administrasi | luas sudah terisi dari batas AOI; isi RT/RW dan luas lahan permukiman |
+| `kelurahan` | Administrasi | luas sudah terisi dari batas AOI; isi jumlah lingkungan dan luas lahan permukiman |
 | `parameter` | Koordinator | semua standar dan asumsi (SNI, template dosen) |
 | `penduduk_seri` | Sosbud & Kependudukan | proyeksi, kepadatan, kebutuhan rumah, sarana, prasarana, DDDTL |
-| `penduduk_struktur` | Sosbud & Kependudukan | struktur penduduk |
+| `penduduk_struktur` | Sosbud & Kependudukan | struktur penduduk (tingkat kecamatan) |
 | `standar_sarana`, `sarana_eksisting` | Sarana & Prasarana | sarana, sentralitas |
 | `rth` | Sarana & Prasarana | RTH 20% |
 | `ekonomi_sektor`, `ekonomi_meta` | Ekonomi & Permukiman | LQ, shift share |

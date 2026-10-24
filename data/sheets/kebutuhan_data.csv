@@ -14,7 +14,7 @@ KB-03,Kebencanaan,Kawasan rawan tsunami,Zona genangan tsunami,SHP,BPBD / inaRISK
 KB-04,Kebencanaan,Jalur & titik evakuasi,Rute & titik kumpul,SHP,BPBD Kota Mataram,Sekunder + survei,Prasarana; SWOT,Kebencanaan,Belum ada,,,
 KB-05,Kebencanaan,Riwayat kejadian bencana,Tahun / lokasi / dampak,Tabel,BPBD + wawancara warga,Sekunder + wawancara,Bencana; SWOT,Kebencanaan,Belum ada,,,
 DM-01,Demografi,Jumlah penduduk per kelurahan,Seri 5 tahun terakhir,Tabel,BPS (Kecamatan Ampenan Dalam Angka),Sekunder - unduh,Proyeksi penduduk; semua kalkulator turunan,Sosial Budaya & Kependudukan,Belum ada,,,
-DM-02,Demografi,Struktur umur & jenis kelamin,Kelompok umur 5 tahunan per kelurahan,Tabel,BPS / Disdukcapil,Sekunder - instansi,Struktur penduduk,Sosial Budaya & Kependudukan,Belum ada,,,
+DM-02,Demografi,Struktur umur & jenis kelamin,Kelompok umur 5 tahunan tingkat kecamatan (tidak tersedia per kelurahan),Tabel,BPS / Disdukcapil,Sekunder - instansi,Struktur penduduk,Sosial Budaya & Kependudukan,Belum ada,,,
 DM-03,Demografi,Jumlah KK / rumah tangga,Per kelurahan,Tabel,BPS / Disdukcapil,Sekunder - instansi,Kebutuhan rumah; prasarana,Sosial Budaya & Kependudukan,Belum ada,,,
 DM-04,Demografi,Kelahiran / kematian / migrasi,Per tahun per kelurahan,Tabel,Disdukcapil / kelurahan,Sekunder - instansi,Indikator demografi,Sosial Budaya & Kependudukan,Belum ada,,,
 DM-05,Demografi,KDB permukiman padat,Tapak bangunan per blok sampel,SHP + foto,Digitasi atap + survei,Digitasi + geotagging,Kepadatan bangunan; WLC,Sosial Budaya & Kependudukan,Belum ada,,,

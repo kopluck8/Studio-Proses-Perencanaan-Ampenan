@@ -53,6 +53,7 @@ function onOpen() {
     .addSeparator()
     .addItem('Tampilkan ID untuk config.json', 'tampilkanId')
     .addItem('Isi ulang satu tab dari repo (menimpa)', 'isiUlangSatuTab')
+    .addItem('Sesuaikan: Lingkungan & struktur penduduk kecamatan', 'sesuaikanLingkunganDanStruktur')
     .addToUi();
 }
 
@@ -191,9 +192,9 @@ const BOLEH = {
   kebutuhan_data: { kolom: ['kondisi', 'catatan_kondisi'] },
   survei_foto: { kolom: ['kategori', 'judul', 'keterangan_temuan', 'kondisi', 'surveyor', 'bidang', 'arah_foto', 'kaitan_analisis'], tambah: true,
     kolomTambah: ['nama_file', 'kategori', 'judul', 'keterangan_temuan', 'kondisi', 'surveyor', 'bidang', 'arah_foto', 'kaitan_analisis'] },
-  kelurahan: { kolom: ['jumlah_rw', 'jumlah_rt', 'lahan_permukiman_ha'] },
+  kelurahan: { kolom: ['jumlah_lingkungan', 'lahan_permukiman_ha'] },
   penduduk_seri: { kolom: '*', kunci: ['kelurahan'] },
-  penduduk_struktur: { kolom: '*', kunci: ['kelurahan', 'kelompok_umur'] },
+  penduduk_struktur: { kolom: '*', kunci: ['kelompok_umur'] },
   sarana_eksisting: { kolom: '*', kunci: ['kelurahan'] },
   rth: { kolom: '*', kunci: ['kelurahan'] },
   ekonomi_sektor: { kolom: '*', kunci: ['sektor'] },
@@ -336,4 +337,78 @@ function catatLog_(baris) {
 
 function jawab_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ===================== Penyesuaian 24 Okt 2026 =====================
+// Ampenan tidak memakai RW (hanya Lingkungan), dan data kelompok umur hanya tersedia
+// tingkat kecamatan. Jalankan sekali dari menu; isian yang sudah ada dipertahankan.
+function sesuaikanLingkunganDanStruktur() {
+  const ss = SpreadsheetApp.getActive();
+  const catatan = [];
+
+  // kelurahan: jumlah_rw + jumlah_rt -> jumlah_lingkungan
+  const kel = ss.getSheetByName('kelurahan');
+  if (kel) {
+    const kepala = kel.getRange(1, 1, 1, kel.getLastColumn()).getValues()[0].map(String);
+    const cRw = kepala.indexOf('jumlah_rw') + 1, cRt = kepala.indexOf('jumlah_rt') + 1;
+    if (cRw) {
+      kel.getRange(1, cRw).setValue('jumlah_lingkungan');
+      catatan.push('kelurahan: kolom jumlah_rw diganti jumlah_lingkungan');
+    }
+    if (cRt) {
+      const isi = kel.getLastRow() > 1 && kel.getRange(2, cRt, kel.getLastRow() - 1, 1).getValues().some((r) => r[0] !== '');
+      if (!isi) { kel.deleteColumn(cRt); catatan.push('kelurahan: kolom jumlah_rt (kosong) dihapus'); }
+      else catatan.push('kelurahan: kolom jumlah_rt berisi data, dibiarkan');
+    }
+  }
+
+  // penduduk_struktur: dari per kelurahan menjadi tingkat kecamatan (jumlahkan isian lama bila ada)
+  const st = ss.getSheetByName('penduduk_struktur');
+  if (st && st.getLastColumn()) {
+    const nilai = st.getDataRange().getValues();
+    const kepala = nilai[0].map(String);
+    if (kepala.indexOf('kelurahan') >= 0) {
+      const cU = kepala.indexOf('kelompok_umur'), cL = kepala.indexOf('laki_laki'), cP = kepala.indexOf('perempuan');
+      const urut = [], jumlah = {};
+      nilai.slice(1).forEach((r) => {
+        const u = String(r[cU]).trim();
+        if (!u) return;
+        if (!jumlah[u]) { jumlah[u] = { L: '', P: '' }; urut.push(u); }
+        const tambah = (lama, v) => { const n = Number(String(v).replace(/\./g, '').replace(',', '.')); return v === '' || isNaN(n) ? lama : (Number(lama) || 0) + n; };
+        jumlah[u].L = tambah(jumlah[u].L, r[cL]);
+        jumlah[u].P = tambah(jumlah[u].P, r[cP]);
+      });
+      st.clear();
+      st.getDataRange().clearDataValidations();
+      const baru = [['kelompok_umur', 'laki_laki', 'perempuan']].concat(urut.map((u) => [u, String(jumlah[u].L), String(jumlah[u].P)]));
+      st.getRange(1, 1, 300, 3).setNumberFormat('@');
+      st.getRange(1, 1, baru.length, 3).setValues(baru);
+      rapikan_(st, 'penduduk_struktur');
+      catatan.push('penduduk_struktur: diubah menjadi tingkat kecamatan (16 kelompok umur)');
+    }
+  }
+
+  // Taman RW -> Taman Lingkungan (standar sarana dan sarana eksisting)
+  const std = ss.getSheetByName('standar_sarana');
+  if (std && std.getLastRow() > 1) {
+    const r = std.getRange(2, 1, std.getLastRow() - 1, 1);
+    r.setValues(r.getValues().map((x) => [x[0] === 'Taman RW' ? 'Taman Lingkungan' : x[0]]));
+  }
+  const sar = ss.getSheetByName('sarana_eksisting');
+  if (sar && sar.getLastColumn()) {
+    const r = sar.getRange(1, 1, 1, sar.getLastColumn());
+    r.setValues([r.getValues()[0].map((x) => (x === 'Taman RW' ? 'Taman Lingkungan' : x))]);
+    catatan.push('sarana: Taman RW diganti Taman Lingkungan');
+  }
+
+  // Keterangan kebutuhan data DM-02
+  const kd = ss.getSheetByName('kebutuhan_data');
+  if (kd && kd.getLastRow() > 1) {
+    const kepala = kd.getRange(1, 1, 1, kd.getLastColumn()).getValues()[0].map(String);
+    const cId = kepala.indexOf('id') + 1, cR = kepala.indexOf('rincian_variabel') + 1;
+    const ids = kd.getRange(2, cId, kd.getLastRow() - 1, 1).getValues();
+    ids.forEach((x, i) => { if (x[0] === 'DM-02') kd.getRange(i + 2, cR).setValue('Kelompok umur 5 tahunan tingkat kecamatan (tidak tersedia per kelurahan)'); });
+  }
+
+  SpreadsheetApp.getUi().alert('Penyesuaian selesai.\n\n' + (catatan.join('\n') || 'Tidak ada yang perlu diubah.'));
 }
