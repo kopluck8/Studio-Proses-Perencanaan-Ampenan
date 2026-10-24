@@ -8,6 +8,7 @@
     ["tugas.html", "Tugas"],
     ["kebutuhan-data.html", "Kebutuhan Data"],
     ["peta-survei.html", "Peta Survei"],
+    ["peta-tematik.html", "Peta Tematik"],
     ["analisis/index.html", "Analisis"],
   ];
 

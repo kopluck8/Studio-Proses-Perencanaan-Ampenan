@@ -123,3 +123,7 @@ scripts/proses_foto.py    pemroses foto
 ```
 
 Catatan wilayah: batas resmi memakai file AOI (sekitar 919 ha) dengan 10 kelurahan: Ampenan Selatan, Ampenan Tengah, Ampenan Utara, Banjar, Bintaro, Dayan Peken, Kebun Sari, Pejarakan Karya, Pejeruk, dan Taman Sari.
+
+## Peta Tematik
+
+Halaman `peta-tematik.html` menampilkan layer GeoJSON di `data/geo/`: tutupan lahan 2020 dan 2025, perubahan lahan, alih fungsi sawah, lahan permukiman 2025, titik cek lapangan (Sentinel-2), serta pola ruang RDTR dan RTRW yang dipotong batas Kecamatan Ampenan. Geometri sudah disederhanakan untuk web; SHP lengkap untuk layout ada di folder proyek `dashboard-studio/perubahan-lahan/`.

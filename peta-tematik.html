@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="id" data-root=".">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peta Tematik · Studio Ampenan</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="peta-tematik.html">
+<main>
+  <div class="page-head">
+    <h1>Peta Tematik</h1>
+    <p class="muted">Data spasial hasil kerja studio: tutupan dan perubahan lahan dari citra Sentinel-2, lahan permukiman, titik cek lapangan, serta rencana pola ruang RDTR dan RTRW Kecamatan Ampenan. Centang layer untuk menampilkan, klik area untuk melihat atributnya.</p>
+  </div>
+  <div class="map-layout">
+    <div id="peta"></div>
+    <aside class="side">
+      <div class="card">
+        <h3>Layer</h3>
+        <div id="daftar-layer" class="grid" style="gap:.35rem"></div>
+      </div>
+      <div class="card">
+        <h3>Legenda</h3>
+        <div id="legenda-tematik" class="grid" style="gap:.6rem"></div>
+      </div>
+      <p class="small muted">Tutupan lahan dari klasifikasi Sentinel-2 10 m (perlu groundcheck). RDTR dari RDTR_KOMAT.kml, RTRW dari peta rencana pola ruang revisi RTRW Kota Mataram; keduanya dipotong batas kelurahan. SHP lengkap dengan gaya QGIS untuk layout ada di folder proyek <i>perubahan-lahan</i>.</p>
+    </aside>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/peta-tematik.js"></script>
+</body>
+</html>
