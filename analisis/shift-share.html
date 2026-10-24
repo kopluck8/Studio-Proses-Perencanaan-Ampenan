@@ -60,7 +60,8 @@ K.halaman({
     // Kolom wilayah kosong: pakai hasil kalkulator Estimasi PDRB Kecamatan.
     const est = K.wilayahDariEstimasi(data, p);
     const dariEst = (h, s) => (h ? h.wilayahPerSektor[s] ?? NaN : NaN);
-    const infoEst = est ? `<div class="notice small">Kolom wilayah di <code>ekonomi_sektor</code> kosong, jadi nilai ${Studio.esc(meta.wilayah || "wilayah studi")} diambil dari <a href="estimasi-pdrb.html">Estimasi PDRB Kecamatan</a>${est.awal ? "" : " (periode akhir saja)"}. Isi kolom wilayah bila ingin memakai data sendiri.</div>` : "";
+    const tanpaInd = est ? est.akhir.tanpaKelompok : [];
+    const infoEst = est ? `<div class="notice small">${tanpaInd.length ? `Sektor tanpa indikator sebaran per kecamatan (${tanpaInd.length} sektor) dibagi sebanding PDRB kecamatan, jadi komponen pergeseran lokalnya tidak bermakna: ${tanpaInd.map((s) => Studio.esc(s.split(".")[0])).join(", ")}. ` : ""}Kolom wilayah di <code>ekonomi_sektor</code> kosong, jadi nilai ${Studio.esc(meta.wilayah || "wilayah studi")} diambil dari <a href="estimasi-pdrb.html">Estimasi PDRB Kecamatan</a>${est.awal ? "" : " (periode akhir saja)"}. Isi kolom wilayah bila ingin memakai data sendiri.</div>` : "";
 
     const semua = data.ekonomi_sektor.map((r) => ({
       sektor: r.sektor, kode: String(r.sektor).split(".")[0].trim(),

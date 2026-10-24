@@ -23,6 +23,7 @@
       <li><b>Kompromi.</b> <code>PDRBₖ = w·PDRBₖ⁽¹⁾ + (1 − w)·PDRBₖ⁽²⁾</code>, w = <code>bobot_konsumsi_pdrb</code> (jurnal: 50%).</li>
       <li><b>Per sektor (IPF).</b> Matriks sektor × kecamatan diawali sebaran pekerja per sektor, lalu disesuaikan berulang sampai jumlah tiap baris = PDRB kota sektor itu dan jumlah tiap kolom = PDRBₖ: <code>p⁽ᵏ⁺¹⁾ᵢₖ = p⁽ᵏ⁾ᵢₖ / Σₖ p⁽ᵏ⁾ᵢₖ × PDRBᵢ</code>, lalu <code>p⁽ᵏ⁺²⁾ᵢₖ = p⁽ᵏ⁺¹⁾ᵢₖ / Σᵢ p⁽ᵏ⁺¹⁾ᵢₖ × PDRBₖ</code>.</li>
     </ol>
+    <p><b>Indikator pengganti.</b> Selama tabulasi pekerja per kecamatan dari BPS belum ada, tab <code>pekerja_sektor</code> berisi indikator per kecamatan dari Kota Mataram Dalam Angka 2026 (sawah dan nilai produksi perikanan untuk A, air PDAM untuk E, minimarket untuk G, koperasi untuk K, guru untuk P, tenaga kesehatan untuk Q), dan <code>ekonomi_meta</code> <code>sebaran_pekerja</code> bernilai "pengganti". Satuan tiap baris boleh berbeda karena IPF hanya memakai proporsi antar-kecamatan dalam satu baris; PDRB per kecamatan lalu hanya memakai pendekatan konsumsi. Sektor tanpa indikator dibagi sebanding PDRB kecamatan.</p>
     <p>Kolom <code>kategori_pdrb</code> di tab <code>pekerja_sektor</code> menghubungkan kelompok pekerja dengan kategori PDRB (huruf A–U). Kelompok boleh dipecah lebih rinci bila sumber datanya rinci.</p>
     <p><b>Keterbatasan.</b> Sektor yang tidak punya pekerja di suatu kecamatan menghasilkan PDRB 0 di kecamatan itu. Karena PDRB dibagi menurut jumlah pekerja, LQ dari hasil estimasi akan mirip LQ tenaga kerja. Hasil adalah petunjuk awal aktivitas ekonomi wilayah kecil dan perlu disebut sebagai estimasi di laporan.</p>
   </details>
@@ -57,7 +58,10 @@ K.halaman({
     const namaW = iw >= 0 ? utama.kec[iw].nama : "–";
     const pdrbW = (h) => (h && h.wilayah >= 0 ? h.pdrbKec[h.wilayah] : NaN);
     const tumbuh = hasil.awal && hasil.akhir ? (pdrbW(hasil.akhir) / pdrbW(hasil.awal) - 1) * 100 : NaN;
-    const catatan = [...new Set(per.flatMap((x) => hasil[x].catatan.map((c) => `${tahun(x)}: ${c}`)))];
+    // Catatan yang sama untuk kedua tahun ditulis sekali.
+    const grupCatatan = new Map();
+    per.forEach((x) => hasil[x].catatan.forEach((c) => grupCatatan.set(c, [...(grupCatatan.get(c) || []), tahun(x)])));
+    const catatan = [...grupCatatan].map(([c, th]) => (th.length === per.length ? c : `${th.join(", ")}: ${c}`));
 
     el.innerHTML = `
       <div class="card blok"><h2>Hasil estimasi ${esc(namaW)}</h2>
@@ -108,13 +112,13 @@ K.halaman({
       const h = hasil[x];
       K.tabelHasil(document.getElementById(`t-kec-${x}`), {
         kolom: ["Kecamatan", "Penduduk", "Share konsumsi (%)", "Pekerja", "Share pekerja (%)", "PDRB konsumsi", "PDRB pekerja", "PDRB rata-rata", "Beda thd rata-rata (%)"],
-        baris: h.kec.map((k, j) => [k.nama, k.penduduk, h.shareKonsumsi[j] * 100, h.jmlPekerja[j], h.sharePekerja[j] * 100,
-          h.pdrbKonsumsi[j], h.pdrbPekerja[j], h.pdrbKec[j], Math.abs(h.pdrbKonsumsi[j] - h.pdrbPekerja[j]) / h.pdrbKec[j] * 100])
-          .concat([["Jumlah", h.kec.reduce((a, k) => a + k.penduduk, 0), 100, h.jmlPekerja.reduce((a, b) => a + b, 0), 100, h.totalKota, h.totalKota, h.totalKota, ""]]),
+        baris: h.kec.map((k, j) => [k.nama, k.penduduk, h.shareKonsumsi[j] * 100, h.pengganti ? "–" : h.jmlPekerja[j], h.pengganti ? "–" : h.sharePekerja[j] * 100,
+          h.pdrbKonsumsi[j], h.pengganti ? "–" : h.pdrbPekerja[j], h.pdrbKec[j], h.pengganti ? "–" : Math.abs(h.pdrbKonsumsi[j] - h.pdrbPekerja[j]) / h.pdrbKec[j] * 100])
+          .concat([["Jumlah", h.kec.reduce((a, k) => a + k.penduduk, 0), 100, h.pengganti ? "–" : h.jmlPekerja.reduce((a, b) => a + b, 0), h.pengganti ? "–" : 100, h.totalKota, h.pengganti ? "–" : h.totalKota, h.totalKota, ""]]),
         desimal: [0, 0, 2, 0, 2, 2, 2, 2, 2],
         kelas: (v, i, j) => (j === 0 && i === h.wilayah ? "ok" : ""),
         namaFile: `estimasi-pdrb-kecamatan-${x}`,
-        catatan: `Pekerja dari ${h.pakaiTotal ? "kolom pekerja_total" : "jumlah tab pekerja_sektor"}. Beda besar (&gt; 30%) berarti kedua pendekatan tidak sepakat untuk kecamatan itu.`,
+        catatan: `${h.pengganti ? "Pendekatan penduduk bekerja tidak dipakai karena sebaran sektor memakai indikator pengganti." : `Pekerja dari ${h.pakaiTotal ? "kolom pekerja_total" : "jumlah tab pekerja_sektor"}.`} Beda besar (&gt; 30%) berarti kedua pendekatan tidak sepakat untuk kecamatan itu.`,
       });
       K.tabelHasil(document.getElementById(`t-ipf-${x}`), {
         kolom: ["Sektor", ...h.kec.map((k) => k.nama), "PDRB kota"],

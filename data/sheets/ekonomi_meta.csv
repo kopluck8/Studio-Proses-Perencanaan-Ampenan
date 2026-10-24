@@ -9,3 +9,4 @@ konsumsi_kapita_kota_awal,
 konsumsi_kapita_kota_akhir,
 sumber_penduduk_kecamatan,Awal 2020: SP2020 (BPS). Akhir 2025: proyeksi penduduk BPS pertengahan tahun (Kota Mataram Dalam Angka 2026 Tabel 3.1.3). Satu sumber untuk semua kecamatan agar share sebanding; angka Dukcapil di penduduk_seri berbeda.
 sumber_pdrb,PDRB ADHK 2010 Kota Mataram: 2020 dari Kota Mataram Dalam Angka 2025 Tabel 12.2; 2025 (angka sangat sementara) dari Kota Mataram Dalam Angka 2026 Tabel 12.2. Miliar rupiah dikali 1.000 menjadi juta rupiah.
+sebaran_pekerja,"pengganti: indikator per kecamatan dari Kota Mataram Dalam Angka 2026 (bukan jumlah pekerja); sektor tanpa indikator dibagi sebanding PDRB kecamatan. Ganti menjadi ""pekerja"" bila tabulasi Sensus Ekonomi 2016 per kecamatan dari BPS sudah diisi."

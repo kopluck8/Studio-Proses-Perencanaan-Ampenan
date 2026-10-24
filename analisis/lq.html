@@ -69,8 +69,11 @@ K.halaman({
     }
     const lqAwal = hitungLQ("sa", "na");
     const adaAwal = lqAwal.some(K.ada);
-    const kelas = (v) => (!K.ada(v) ? "–" : v > 1.005 ? "Basis" : v < 0.995 ? "Non-basis" : "Seimbang");
-    const nBasis = lqAkhir.filter((v) => K.ada(v) && v > 1.005).length;
+    // Sektor tanpa indikator sebaran dibagi sebanding PDRB kecamatan, jadi LQ-nya bukan hasil pengamatan.
+    const tanpa = new Set(est ? est.akhir.tanpaKelompok : []);
+    const kelasDasar = (v) => (!K.ada(v) ? "–" : v > 1.005 ? "Basis" : v < 0.995 ? "Non-basis" : "Seimbang");
+    const kelas = (v, s) => (tanpa.has(s) && K.ada(v) ? "Tanpa indikator" : kelasDasar(v));
+    const nBasis = baris.filter((b, i) => !tanpa.has(b.sektor) && K.ada(lqAkhir[i]) && lqAkhir[i] > 1.005).length;
     const tAkhir = meta.tahun_akhir || "akhir", tAwal = meta.tahun_awal || "awal";
     const urut = baris.map((b, i) => ({ ...b, lq: lqAkhir[i], lq0: lqAwal[i] })).filter((b) => K.ada(b.lq)).sort((a, b) => b.lq - a.lq);
 
@@ -79,7 +82,7 @@ K.halaman({
         <div class="hasil-ringkas">
           <div><span class="small muted">Variabel</span><b>${Studio.esc(meta.variabel || "–")}</b></div>
           <div><span class="small muted">Wilayah / pembanding</span><b>${Studio.esc(meta.wilayah || "–")} / ${Studio.esc(meta.pembanding || "–")}</b></div>
-          <div><span class="small muted">Sektor basis (${Studio.esc(tAkhir)})</span><b>${nBasis} dari ${urut.length}</b></div>
+          <div><span class="small muted">Sektor basis (${Studio.esc(tAkhir)})</span><b>${nBasis} dari ${urut.filter((b) => !tanpa.has(b.sektor)).length}</b></div>
           <div><span class="small muted">LQ tertinggi</span><b>${Studio.esc(singkat(urut[0].sektor))} (${K.fmt(urut[0].lq, 2)})</b></div>
         </div>
         <div id="t-lq"></div>
@@ -90,22 +93,22 @@ K.halaman({
     K.tabelHasil(document.getElementById("t-lq"), {
       kolom,
       baris: baris.map((b, i) => {
-        const r = [b.sektor, b.sk, b.nk, lqAkhir[i], kelas(lqAkhir[i])];
-        if (adaAwal) r.push(lqAwal[i], kelas(lqAwal[i]), lqAkhir[i] - lqAwal[i]);
+        const r = [b.sektor, b.sk, b.nk, lqAkhir[i], kelas(lqAkhir[i], b.sektor)];
+        if (adaAwal) r.push(lqAwal[i], kelas(lqAwal[i], b.sektor), lqAkhir[i] - lqAwal[i]);
         return r;
       }),
       desimal: [0, 0, 0, 3, 0, 3, 0, 3],
-      kelas: (v, i, j) => ((j === 4 || j === 6) ? (v === "Basis" ? "ok" : v === "Non-basis" ? "" : "") : j === 3 && K.ada(v) && v > 1.005 ? "ok" : ""),
+      kelas: (v, i, j) => ((j === 4 || j === 6) ? (v === "Basis" ? "ok" : "") : j === 3 && K.ada(v) && v > 1.005 && !tanpa.has(baris[i].sektor) ? "ok" : ""),
       namaFile: "location-quotient",
-      catatan: `Basis bila LQ &gt; 1. Satuan: ${Studio.esc(meta.satuan || "-")}.`,
+      catatan: `Basis bila LQ &gt; 1. Satuan: ${Studio.esc(meta.satuan || "-")}.${tanpa.size ? ` "Tanpa indikator": sektor yang belum punya data sebaran per kecamatan, PDRB-nya dibagi sebanding PDRB kecamatan sehingga LQ-nya hanya sisa perhitungan dan tidak boleh dibaca sebagai basis/non-basis.` : ""}`,
     });
     K.grafik("g-lq", {
       type: "bar",
       data: { labels: urut.map((b) => singkat(b.sektor)), datasets: [{
         label: `LQ ${tAkhir}`, data: urut.map((b) => b.lq),
-        backgroundColor: urut.map((b) => (b.lq > 1.005 ? "#1f6f5c" : "#9aa5a0")),
+        backgroundColor: urut.map((b) => (tanpa.has(b.sektor) ? "#d9dedb" : b.lq > 1.005 ? "#1f6f5c" : "#9aa5a0")),
       }] },
-      options: { indexAxis: "y", plugins: { legend: { display: false }, title: { display: true, text: "LQ per sektor (garis merah = 1; hijau = basis)" } },
+      options: { indexAxis: "y", plugins: { legend: { display: false }, title: { display: true, text: `LQ per sektor (garis merah = 1; hijau = basis${tanpa.size ? "; abu muda = tanpa indikator" : ""})` } },
         scales: { x: { beginAtZero: true } } },
       plugins: [garisSatu],
     });

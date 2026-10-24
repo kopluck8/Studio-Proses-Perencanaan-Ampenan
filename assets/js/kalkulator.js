@@ -240,7 +240,14 @@
     if (!(totPekerja > 0)) return null;
     const sharePekerja = jmlPekerja.map((v) => v / totPekerja);
 
-    const bobot = ada(angka(p.bobot_konsumsi_pdrb)) ? Math.min(100, Math.max(0, angka(p.bobot_konsumsi_pdrb))) / 100 : 0.5;
+    let bobot = ada(angka(p.bobot_konsumsi_pdrb)) ? Math.min(100, Math.max(0, angka(p.bobot_konsumsi_pdrb))) / 100 : 0.5;
+    // Indikator pengganti (bukan jumlah pekerja) tidak bisa dijumlah antar-sektor, jadi PDRB per kecamatan
+    // hanya memakai pendekatan konsumsi kecuali kolom pekerja_total diisi.
+    const pengganti = /pengganti/i.test(meta.sebaran_pekerja || "");
+    if (pengganti && !pakaiTotal) {
+      bobot = 1;
+      catatan.push("Sebaran sektor memakai indikator pengganti (bukan jumlah pekerja), jadi PDRB per kecamatan hanya dari pendekatan konsumsi rumah tangga. Isi pekerja_total atau data pekerja BPS agar pendekatan penduduk bekerja ikut dipakai.");
+    }
     const totalKota = sektor.reduce((a, s) => a + s.pdrb, 0);
     const pdrbKonsumsi = shareKonsumsi.map((s) => s * totalKota);
     const pdrbPekerja = sharePekerja.map((s) => s * totalKota);
@@ -263,9 +270,9 @@
     let iw = kec.findIndex((k) => target.includes(k.nama.toLowerCase()));
     if (iw < 0) iw = kec.findIndex((k) => /ampenan/i.test(k.nama));
     return {
-      periode, sektor, kec, bobot, totalKota, konsumsi, shareKonsumsi, jmlPekerja, sharePekerja, pakaiTotal,
+      periode, sektor, kec, bobot, totalKota, pengganti: pengganti && !pakaiTotal, konsumsi, shareKonsumsi, jmlPekerja, sharePekerja, pakaiTotal,
       pdrbKonsumsi, pdrbPekerja, pdrbKec, matriks: hasilIpf.matriks, iterasi: hasilIpf.iterasi, galat: hasilIpf.galat,
-      wilayah: iw, catatan,
+      wilayah: iw, catatan, tanpaKelompok,
       // nilai wilayah studi per sektor, dipetakan ke nama sektor di ekonomi_sektor
       wilayahPerSektor: Object.fromEntries(sektor.map((s, i) => [s.sektor, iw >= 0 ? hasilIpf.matriks[i][iw] : NaN])),
     };

@@ -1,19 +1,7 @@
 kelompok,kategori_pdrb,periode,Ampenan,Cakranegara,Mataram,Sandubaya,Sekarbela,Selaparang
-"Pertanian, kehutanan, perikanan",A,awal,,,,,,
-Pertambangan dan penggalian,B,awal,,,,,,
-Industri pengolahan,C,awal,,,,,,
-"Listrik, gas, dan air","D,E",awal,,,,,,
-Konstruksi,F,awal,,,,,,
-"Perdagangan, hotel, dan restoran","G,I",awal,,,,,,
-"Transportasi, pergudangan, dan komunikasi","H,J",awal,,,,,,
-"Keuangan, real estat, dan jasa perusahaan","K,L,M,N",awal,,,,,,
-"Jasa-jasa (pemerintahan, pendidikan, kesehatan, lainnya)","O,P,Q,R,S,T,U",awal,,,,,,
-"Pertanian, kehutanan, perikanan",A,akhir,,,,,,
-Pertambangan dan penggalian,B,akhir,,,,,,
-Industri pengolahan,C,akhir,,,,,,
-"Listrik, gas, dan air","D,E",akhir,,,,,,
-Konstruksi,F,akhir,,,,,,
-"Perdagangan, hotel, dan restoran","G,I",akhir,,,,,,
-"Transportasi, pergudangan, dan komunikasi","H,J",akhir,,,,,,
-"Keuangan, real estat, dan jasa perusahaan","K,L,M,N",akhir,,,,,,
-"Jasa-jasa (pemerintahan, pendidikan, kesehatan, lainnya)","O,P,Q,R,S,T,U",akhir,,,,,,
+"Pertanian & perikanan (pengganti: rata-rata share luas sawah dan nilai produksi perikanan, 2025)",A,awal,"29,8289","7,9051","5,9476","17,7751","31,6273","6,9160"
+"Pengadaan air (pengganti: air PDAM disalurkan, m3, 2025)",E,awal,2889973,3017733,2485353,2480176,3206730,2572984
+"Perdagangan (pengganti: jumlah pasar swalayan/minimarket, 2024)",G,awal,30,50,42,27,18,35
+"Jasa keuangan (pengganti: jumlah koperasi, 2025)",K,awal,38,34,45,22,21,47
+"Jasa pendidikan (pengganti: kepala sekolah dan guru TK–SMA/MA, 2025/2026)",P,awal,1173,870,1363,1151,957,2075
+"Jasa kesehatan (pengganti: tenaga kesehatan, 2025)",Q,awal,654,858,2943,2928,1096,3182

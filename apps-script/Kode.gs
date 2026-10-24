@@ -426,8 +426,14 @@ function sesuaikanEstimasiPdrb() {
 
   ['pdrb_kecamatan', 'pekerja_sektor'].forEach((nama) => {
     let sh = ss.getSheetByName(nama);
-    if (sh && sh.getLastRow() > 1) { catatan.push(nama + ': sudah ada, dilewati'); return; }
+    // Tab yang sudah ada tetapi angkanya masih kosong semua diisi ulang dari repo.
+    const mulai = nama === 'pekerja_sektor' ? 4 : 2;
+    const adaIsi = sh && sh.getLastRow() > 1 && sh.getLastColumn() >= mulai &&
+      sh.getRange(2, mulai, sh.getLastRow() - 1, sh.getLastColumn() - mulai + 1).getValues().some((r) => r.some((v) => String(v).trim() !== ''));
+    if (adaIsi) { catatan.push(nama + ': sudah berisi, dilewati'); return; }
     if (!sh) sh = ss.insertSheet(nama, TAB.indexOf(nama));
+    sh.clear();
+    sh.getDataRange().clearDataValidations();
     isiDariRepo_(sh, nama);
     catatan.push(nama + ': tab dibuat');
   });
