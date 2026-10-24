@@ -45,6 +45,8 @@ Setelah itu dashboard membaca Sheets langsung setiap kali halaman dibuka; peruba
 
 Menu **Sesuaikan: Estimasi PDRB kecamatan** (sekali, setelah `Kode.gs` diperbarui) membuat tab `pdrb_kecamatan` dan `pekerja_sektor`, menambah baris baru di `ekonomi_meta` dan `parameter`, serta memperbarui kebutuhan data ekonomi tanpa menimpa isian.
 
+Menu **Sesuaikan: Perubahan lahan (Sentinel-2)** (sekali, setelah `Kode.gs` diperbarui) mengganti kelas di tab `lahan` yang masih kosong dengan hasil klasifikasi Sentinel-2 2020 dan 2025, membuat tab `lahan_transisi`, mengisi tahun dan sumber di `lahan_meta`, mengisi baris *Mismatch: KP2B* di `mismatch`, dan memperbarui kebutuhan data FL-07, FL-08 dan EK-05. Angka yang sudah diisi tim tidak ditimpa.
+
 Menu **Isi ulang satu tab dari repo** menimpa satu tab dengan isi awal dari repo, berguna bila sebuah tab rusak atau ada kolom baru.
 
 ### Isian yang diterima
@@ -75,7 +77,7 @@ Semua tab di bawah dibuat otomatis oleh Apps Script (langkah 2). Daftar tab dan 
 | `rth` | Sarana & Prasarana | RTH 20% |
 | `ekonomi_sektor`, `ekonomi_meta` | Ekonomi & Permukiman | estimasi PDRB kecamatan (kolom pembanding = PDRB Kota Mataram), LQ, shift share |
 | `pdrb_kecamatan`, `pekerja_sektor` | Ekonomi & Permukiman | estimasi PDRB kecamatan; hasilnya mengisi kolom wilayah LQ dan shift share bila kolom itu kosong |
-| `lahan`, `lahan_meta` | Fisik & Lingkungan | perubahan lahan |
+| `lahan`, `lahan_meta`, `lahan_transisi` | Fisik & Lingkungan | perubahan lahan; sudah terisi dari klasifikasi Sentinel-2 2020 dan 2025 (perlu groundcheck) |
 | `skl` | Fisik & Lingkungan | SKL |
 | `bencana` | Kebencanaan | keterpaparan bencana |
 | `cagar_budaya` | Sosbud & Kependudukan | kondisi cagar budaya |

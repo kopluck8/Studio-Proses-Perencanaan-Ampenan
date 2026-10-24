@@ -1,81 +1,61 @@
 kelurahan,guna_lahan,luas_tahun_awal_ha,luas_tahun_akhir_ha
-Ampenan Selatan,Permukiman,,
-Ampenan Selatan,Sawah/KP2B,,
-Ampenan Selatan,Tegalan/kebun,,
-Ampenan Selatan,Perdagangan & jasa,,
-Ampenan Selatan,Perkantoran & fasilitas umum,,
-Ampenan Selatan,RTH,,
-Ampenan Selatan,Badan air,,
-Ampenan Selatan,Lainnya,,
-Ampenan Tengah,Permukiman,,
-Ampenan Tengah,Sawah/KP2B,,
-Ampenan Tengah,Tegalan/kebun,,
-Ampenan Tengah,Perdagangan & jasa,,
-Ampenan Tengah,Perkantoran & fasilitas umum,,
-Ampenan Tengah,RTH,,
-Ampenan Tengah,Badan air,,
-Ampenan Tengah,Lainnya,,
-Ampenan Utara,Permukiman,,
-Ampenan Utara,Sawah/KP2B,,
-Ampenan Utara,Tegalan/kebun,,
-Ampenan Utara,Perdagangan & jasa,,
-Ampenan Utara,Perkantoran & fasilitas umum,,
-Ampenan Utara,RTH,,
-Ampenan Utara,Badan air,,
-Ampenan Utara,Lainnya,,
-Banjar,Permukiman,,
-Banjar,Sawah/KP2B,,
-Banjar,Tegalan/kebun,,
-Banjar,Perdagangan & jasa,,
-Banjar,Perkantoran & fasilitas umum,,
-Banjar,RTH,,
-Banjar,Badan air,,
-Banjar,Lainnya,,
-Bintaro,Permukiman,,
-Bintaro,Sawah/KP2B,,
-Bintaro,Tegalan/kebun,,
-Bintaro,Perdagangan & jasa,,
-Bintaro,Perkantoran & fasilitas umum,,
-Bintaro,RTH,,
-Bintaro,Badan air,,
-Bintaro,Lainnya,,
-Dayan Peken,Permukiman,,
-Dayan Peken,Sawah/KP2B,,
-Dayan Peken,Tegalan/kebun,,
-Dayan Peken,Perdagangan & jasa,,
-Dayan Peken,Perkantoran & fasilitas umum,,
-Dayan Peken,RTH,,
-Dayan Peken,Badan air,,
-Dayan Peken,Lainnya,,
-Kebun Sari,Permukiman,,
-Kebun Sari,Sawah/KP2B,,
-Kebun Sari,Tegalan/kebun,,
-Kebun Sari,Perdagangan & jasa,,
-Kebun Sari,Perkantoran & fasilitas umum,,
-Kebun Sari,RTH,,
-Kebun Sari,Badan air,,
-Kebun Sari,Lainnya,,
-Pejarakan Karya,Permukiman,,
-Pejarakan Karya,Sawah/KP2B,,
-Pejarakan Karya,Tegalan/kebun,,
-Pejarakan Karya,Perdagangan & jasa,,
-Pejarakan Karya,Perkantoran & fasilitas umum,,
-Pejarakan Karya,RTH,,
-Pejarakan Karya,Badan air,,
-Pejarakan Karya,Lainnya,,
-Pejeruk,Permukiman,,
-Pejeruk,Sawah/KP2B,,
-Pejeruk,Tegalan/kebun,,
-Pejeruk,Perdagangan & jasa,,
-Pejeruk,Perkantoran & fasilitas umum,,
-Pejeruk,RTH,,
-Pejeruk,Badan air,,
-Pejeruk,Lainnya,,
-Taman Sari,Permukiman,,
-Taman Sari,Sawah/KP2B,,
-Taman Sari,Tegalan/kebun,,
-Taman Sari,Perdagangan & jasa,,
-Taman Sari,Perkantoran & fasilitas umum,,
-Taman Sari,RTH,,
-Taman Sari,Badan air,,
-Taman Sari,Lainnya,,
+Ampenan Selatan,Permukiman & lahan terbangun,"77,21","81,5"
+Ampenan Selatan,Sawah & tanaman semusim,"3,31","2,16"
+Ampenan Selatan,Kebun campuran & pepohonan,"13,85","11,31"
+Ampenan Selatan,Rumput & semak,"2,53","2,43"
+Ampenan Selatan,Lahan terbuka,"3,01","2,51"
+Ampenan Selatan,Badan air,"0,09","0,1"
+Ampenan Tengah,Permukiman & lahan terbangun,"55,29","55,92"
+Ampenan Tengah,Sawah & tanaman semusim,"0,06",0
+Ampenan Tengah,Kebun campuran & pepohonan,"3,52","3,36"
+Ampenan Tengah,Rumput & semak,"0,14","0,26"
+Ampenan Tengah,Lahan terbuka,"1,76","1,46"
+Ampenan Tengah,Badan air,"0,71","0,49"
+Ampenan Utara,Permukiman & lahan terbangun,"74,48","83,67"
+Ampenan Utara,Sawah & tanaman semusim,"69,66","63,27"
+Ampenan Utara,Kebun campuran & pepohonan,"36,98","37,51"
+Ampenan Utara,Rumput & semak,"33,29","30,23"
+Ampenan Utara,Lahan terbuka,"0,39","0,09"
+Ampenan Utara,Badan air,0,"0,02"
+Banjar,Permukiman & lahan terbangun,"22,67","22,92"
+Banjar,Sawah & tanaman semusim,0,0
+Banjar,Kebun campuran & pepohonan,"0,36","0,58"
+Banjar,Rumput & semak,"0,09","0,12"
+Banjar,Lahan terbuka,"1,87","1,37"
+Banjar,Badan air,"0,24","0,24"
+Bintaro,Permukiman & lahan terbangun,"56,78","62,19"
+Bintaro,Sawah & tanaman semusim,"1,62","0,32"
+Bintaro,Kebun campuran & pepohonan,"18,53","14,47"
+Bintaro,Rumput & semak,"5,79","4,65"
+Bintaro,Lahan terbuka,"3,99","4,67"
+Bintaro,Badan air,"2,57","2,98"
+Dayan Peken,Permukiman & lahan terbangun,"48,15","50,01"
+Dayan Peken,Sawah & tanaman semusim,0,"0,05"
+Dayan Peken,Kebun campuran & pepohonan,"4,58","2,58"
+Dayan Peken,Rumput & semak,"0,01","0,1"
+Dayan Peken,Lahan terbuka,0,0
+Dayan Peken,Badan air,0,0
+Kebun Sari,Permukiman & lahan terbangun,"24,46","25,09"
+Kebun Sari,Sawah & tanaman semusim,0,0
+Kebun Sari,Kebun campuran & pepohonan,"1,75","1,12"
+Kebun Sari,Rumput & semak,0,0
+Kebun Sari,Lahan terbuka,0,0
+Kebun Sari,Badan air,0,0
+Pejarakan Karya,Permukiman & lahan terbangun,"88,46","93,95"
+Pejarakan Karya,Sawah & tanaman semusim,"15,56","10,98"
+Pejarakan Karya,Kebun campuran & pepohonan,"17,71","14,92"
+Pejarakan Karya,Rumput & semak,"3,88","5,76"
+Pejarakan Karya,Lahan terbuka,0,0
+Pejarakan Karya,Badan air,0,0
+Pejeruk,Permukiman & lahan terbangun,"68,02","70,77"
+Pejeruk,Sawah & tanaman semusim,"2,73","1,73"
+Pejeruk,Kebun campuran & pepohonan,"7,37","6,19"
+Pejeruk,Rumput & semak,"2,6","2,03"
+Pejeruk,Lahan terbuka,0,0
+Pejeruk,Badan air,0,0
+Taman Sari,Permukiman & lahan terbangun,"121,1","127,16"
+Taman Sari,Sawah & tanaman semusim,"3,02","2,03"
+Taman Sari,Kebun campuran & pepohonan,"17,65","12,5"
+Taman Sari,Rumput & semak,"0,75","0,78"
+Taman Sari,Lahan terbuka,"0,06","0,11"
+Taman Sari,Badan air,"0,05","0,05"

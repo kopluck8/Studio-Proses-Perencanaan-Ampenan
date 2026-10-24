@@ -1,3 +1,5 @@
 kunci,nilai
-tahun_awal,
-tahun_akhir,
+tahun_awal,2020
+tahun_akhir,2025
+sumber,"Klasifikasi citra Sentinel-2 L2A 10 m (Random Forest); kelas 2020 = modus 2019–2021, kelas 2025 = modus 2024–2026; batas kelurahan dari file AOI. Perlu groundcheck."
+catatan,"Kelas tutupan lahan: rumah, toko, kantor dan jalan digabung sebagai permukiman & lahan terbangun; sawah bera bisa terbaca rumput & semak."

@@ -20,7 +20,7 @@ const TAB = [
   'jadwal', 'tugas', 'kebutuhan_data', 'survei_foto',
   'kelurahan', 'parameter', 'penduduk_seri', 'penduduk_struktur',
   'standar_sarana', 'sarana_eksisting', 'rth',
-  'ekonomi_sektor', 'ekonomi_meta', 'pdrb_kecamatan', 'pekerja_sektor', 'lahan', 'lahan_meta', 'skl',
+  'ekonomi_sektor', 'ekonomi_meta', 'pdrb_kecamatan', 'pekerja_sektor', 'lahan', 'lahan_meta', 'lahan_transisi', 'skl',
   'bencana', 'cagar_budaya', 'stakeholder', 'anggaran',
   'ahp_responden', 'wlc_layer', 'zonasi_wlc', 'mismatch', 'swot',
 ];
@@ -55,6 +55,7 @@ function onOpen() {
     .addItem('Isi ulang satu tab dari repo (menimpa)', 'isiUlangSatuTab')
     .addItem('Sesuaikan: Lingkungan & struktur penduduk kecamatan', 'sesuaikanLingkunganDanStruktur')
     .addItem('Sesuaikan: Estimasi PDRB kecamatan', 'sesuaikanEstimasiPdrb')
+    .addItem('Sesuaikan: Perubahan lahan (Sentinel-2)', 'sesuaikanPerubahanLahan')
     .addToUi();
 }
 
@@ -204,6 +205,7 @@ const BOLEH = {
   pekerja_sektor: { kolom: '*', kunci: ['kelompok', 'kategori_pdrb', 'periode'], tambah: true },
   lahan: { kolom: '*', kunci: ['kelurahan'], tambah: true },
   lahan_meta: { kolom: '*', kunci: ['kunci'] },
+  lahan_transisi: { kolom: '*', kunci: ['kelurahan', 'dari', 'menjadi'], tambah: true },
   skl: { kolom: '*', tambah: true },
   bencana: { kolom: '*', kunci: ['kelurahan'] },
   cagar_budaya: { kolom: '*', tambah: true },
@@ -520,6 +522,79 @@ function sesuaikanEstimasiPdrb() {
         });
         catatan.push('kebutuhan_data: ' + r[0] + ' diperbarui');
       }
+    });
+  }
+
+  SpreadsheetApp.getUi().alert('Penyesuaian selesai.\n\n' + (catatan.join('\n') || 'Tidak ada yang perlu diubah.'));
+}
+
+// Mengisi tab perubahan lahan dari hasil klasifikasi Sentinel-2 di repo. Angka yang sudah diisi tim tidak ditimpa.
+function sesuaikanPerubahanLahan() {
+  const ss = SpreadsheetApp.getActive();
+  const catatan = [];
+  const repo = (nama) => {
+    const res = UrlFetchApp.fetch(REPO_RAW + nama + '.csv', { muteHttpExceptions: true });
+    return res.getResponseCode() === 200 ? Utilities.parseCsv(res.getContentText('UTF-8')) : null;
+  };
+  const kosongSemua = (sh, mulai) => !(sh.getLastRow() > 1 && sh.getLastColumn() >= mulai &&
+    sh.getRange(2, mulai, sh.getLastRow() - 1, sh.getLastColumn() - mulai + 1).getValues().some((r) => r.some((v) => String(v).trim() !== '')));
+
+  // lahan (kelas lama masih kosong) dan lahan_transisi (tab baru) diisi ulang dari repo.
+  [['lahan', 3], ['lahan_transisi', 4]].forEach(([nama, mulai]) => {
+    let sh = ss.getSheetByName(nama);
+    if (sh && !kosongSemua(sh, mulai)) { catatan.push(nama + ': sudah berisi angka, dilewati (pakai menu Isi ulang satu tab bila ingin menimpa)'); return; }
+    const baru = !sh;
+    if (!sh) sh = ss.insertSheet(nama, TAB.indexOf(nama));
+    sh.clear();
+    sh.getDataRange().clearDataValidations();
+    isiDariRepo_(sh, nama);
+    catatan.push(nama + (baru ? ': tab dibuat dan diisi' : ': diisi dari klasifikasi Sentinel-2'));
+  });
+
+  // Isi sel kosong pada baris yang kuncinya sama dengan salinan repo; baris yang belum ada ditambahkan bila diminta.
+  const isiKosong = (nama, kunci, kolom, tambah, saring) => {
+    const sh = ss.getSheetByName(nama), data = repo(nama);
+    if (!sh || !data) return;
+    const kRepo = data[0], nilai = sh.getDataRange().getValues(), kepala = nilai[0].map((v) => String(v).trim());
+    const id = (r, kp) => kunci.map((k) => String(r[kp.indexOf(k)]).trim()).join('|');
+    const peta = {};
+    nilai.slice(1).forEach((r, i) => { peta[id(r, kepala)] = i + 2; });
+    let n = 0;
+    data.slice(1).filter((r) => !saring || saring(r, kRepo)).forEach((r) => {
+      const baris = peta[id(r, kRepo)];
+      if (!baris) {
+        if (!tambah) return;
+        const isi = kepala.map((k) => { const j = kRepo.indexOf(k); return j < 0 ? '' : r[j]; });
+        sh.getRange(sh.getLastRow() + 1, 1, 1, isi.length).setNumberFormat('@').setValues([isi]);
+        catatan.push(nama + ': baris ' + id(r, kRepo) + ' ditambahkan');
+        return;
+      }
+      kolom.forEach((k) => {
+        const c = kepala.indexOf(k), j = kRepo.indexOf(k);
+        if (c < 0 || j < 0 || r[j] === '' || String(nilai[baris - 1][c]).trim() !== '') return;
+        sh.getRange(baris, c + 1).setNumberFormat('@').setValue(r[j]);
+        n++;
+      });
+    });
+    if (n) catatan.push(nama + ': ' + n + ' sel kosong diisi');
+  };
+  isiKosong('lahan_meta', ['kunci'], ['nilai'], true);
+  isiKosong('mismatch', ['kelurahan', 'jenis'], ['luas_ha', 'luas_zona_ha'], false, (r, k) => r[k.indexOf('jenis')] === 'Mismatch: KP2B');
+
+  // Kebutuhan data FL-07, FL-08, EK-05: kondisi diperbarui hanya bila masih "Belum ada".
+  const kd = ss.getSheetByName('kebutuhan_data'), data = repo('kebutuhan_data');
+  if (kd && data) {
+    const kRepo = data[0], kepala = kd.getRange(1, 1, 1, kd.getLastColumn()).getValues()[0].map(String);
+    const ids = kd.getRange(1, 1, kd.getLastRow(), 1).getValues().map((r) => String(r[0]).trim());
+    const cK = kepala.indexOf('kondisi'), cC = kepala.indexOf('catatan_kondisi');
+    data.slice(1).filter((r) => ['FL-07', 'FL-08', 'EK-05'].indexOf(r[0]) >= 0).forEach((r) => {
+      const i = ids.indexOf(r[0]);
+      if (i < 0 || cK < 0) return;
+      const lama = String(kd.getRange(i + 1, cK + 1).getValue()).trim();
+      if (lama && lama !== 'Belum ada') return;
+      kd.getRange(i + 1, cK + 1).setValue(r[kRepo.indexOf('kondisi')]);
+      if (cC >= 0) kd.getRange(i + 1, cC + 1).setValue(r[kRepo.indexOf('catatan_kondisi')]);
+      catatan.push('kebutuhan_data: ' + r[0] + ' diperbarui');
     });
   }
 

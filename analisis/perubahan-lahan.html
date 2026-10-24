@@ -11,7 +11,7 @@
   <div class="page-head">
     <p class="small"><a href="index.html">← Semua kalkulator</a></p>
     <h1>Perubahan dan Alih Fungsi Lahan</h1>
-    <p class="muted">Aspek Fisik &amp; Lingkungan dan Ekonomi · PJ Bidang Fisik &amp; Lingkungan bersama Bidang Ekonomi &amp; Permukiman. Isi luas tiap guna lahan per kelurahan untuk dua titik tahun (hasil digitasi citra di QGIS) di tab <code>lahan</code>, dan tahunnya di tab <code>lahan_meta</code>. Kelas guna lahan boleh ditambah atau diganti.</p>
+    <p class="muted">Aspek Fisik &amp; Lingkungan dan Ekonomi · PJ Bidang Fisik &amp; Lingkungan bersama Bidang Ekonomi &amp; Permukiman. Isi luas tiap guna lahan per kelurahan untuk dua titik tahun di tab <code>lahan</code>, tahunnya di tab <code>lahan_meta</code>, dan luas perpindahan antarkelas di tab <code>lahan_transisi</code>. Angka awal diisi dari klasifikasi citra Sentinel-2 tahun 2020 dan 2025 dan masih perlu groundcheck. Kelas guna lahan boleh ditambah atau diganti.</p>
   </div>
   <div id="kalkulator"></div>
   <details class="card blok rumus">
@@ -21,8 +21,10 @@
       <li>Laju perubahan per tahun <code>(L₂ − L₁) / L₁ / Δt × 100%</code>; nilai negatif berarti luasnya berkurang</li>
       <li>Laju alih fungsi lahan pertanian (KP2B) <code>(L₁ − L₂) / L₁ / Δt × 100%</code>, dihitung untuk kelas yang namanya memuat "Sawah" atau "KP2B"</li>
       <li>Komposisi guna lahan <code>Lᵢ / ΣL × 100%</code> per kelurahan</li>
+      <li>Matriks transisi <code>Tᵢⱼ</code> = luas kelas i pada tahun awal yang menjadi kelas j pada tahun akhir. Alih fungsi bruto lahan pertanian = Σ <code>Tᵢⱼ</code> dengan i sawah/KP2B dan j bukan sawah/KP2B; perubahan bersih = alih fungsi bruto − sawah baru.</li>
     </ul>
-    <p>Δt = tahun akhir − tahun awal. Sumber: proposal Bab 3.3.2 (penggunaan lahan eksisting dan perubahan; pengaruh ekonomi terhadap konversi KP2B di Pejeruk dan Ampenan Utara). Luas diperoleh dari digitasi on-screen citra satelit dan groundcheck.</p>
+    <p>Δt = tahun akhir − tahun awal. Sumber: proposal Bab 3.3.2 (penggunaan lahan eksisting dan perubahan; pengaruh ekonomi terhadap konversi KP2B di Pejeruk dan Ampenan Utara).</p>
+    <p>Angka awal di tab <code>lahan</code> dan <code>lahan_transisi</code> berasal dari klasifikasi citra Sentinel-2 L2A (10 m). Semua citra satu tahun yang wilayah Ampenan-nya minimal setengah bebas awan dipakai, lalu awan dan bayangan dibuang per piksel. Klasifikasi memakai Random Forest dengan sampel latih dari ESA WorldCover 2020/2021 yang lolos saringan spektral. Kelas tahun 2020 adalah modus 2019–2021 dan kelas 2025 adalah modus 2024–2026, supaya perubahan semu satu tahun tersaring. Ini kelas tutupan lahan: rumah, toko, kantor dan jalan tidak bisa dibedakan dari citra 10 m sehingga digabung sebagai permukiman &amp; lahan terbangun. Hasilnya perlu dicek di lapangan sebelum dipakai sebagai angka final.</p>
   </details>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -33,7 +35,8 @@
 K.halaman({
   tabs: [
     { nama: "lahan", judul: "Luas guna lahan per kelurahan", kunci: ["kelurahan"], teks: ["guna_lahan"], tambahBaris: true },
-    { nama: "lahan_meta", judul: "Tahun pengamatan", kunci: ["kunci"], teks: ["nilai"] },
+    { nama: "lahan_meta", judul: "Tahun pengamatan dan sumber", kunci: ["kunci"], teks: ["nilai"] },
+    { nama: "lahan_transisi", judul: "Perpindahan antarkelas (matriks transisi)", kunci: ["kelurahan"], teks: ["dari", "menjadi"], tambahBaris: true, tertutup: true },
   ],
   hitung({ data, el }) {
     const esc = Studio.esc;
@@ -52,23 +55,42 @@ K.halaman({
     const jml = (f, k) => baris.filter(f).reduce((a, b) => a + (K.ada(b[k]) ? b[k] : 0), 0);
     const laju = (a, b) => (K.ada(dt) && a > 0 ? ((b - a) / a / dt) * 100 : NaN);
     const pertanian = (g) => /sawah|kp2b/i.test(g);
+    // Warna grafik mengikuti jenis guna lahan bila namanya dikenali, selain itu palet bawaan.
+    const WARNA_GUNA = [[/permukiman|terbangun/i, "#d9534f"], [/sawah|kp2b/i, "#e3b505"], [/kebun|pohon|hutan/i, "#2e7d32"],
+      [/rumput|semak|rth|taman/i, "#8bc34a"], [/terbuka|kosong|pasir/i, "#b08d57"], [/air|sungai|tambak|kolam/i, "#3c78dc"]];
+    const warnaGuna = (g, i) => (WARNA_GUNA.find(([re]) => re.test(g)) || [null, K.WARNA[i % 10]])[1];
 
     // Rekap kecamatan per kelas guna lahan
     const rekap = kelas.map((g) => { const L1 = jml((b) => b.gl === g, "L1"), L2 = jml((b) => b.gl === g, "L2"); return [g, L1, L2, L2 - L1, L1 > 0 ? ((L2 - L1) / L1) * 100 : NaN, laju(L1, L2)]; });
     const T1 = jml(() => true, "L1"), T2 = jml(() => true, "L2");
     const kp1 = jml((b) => pertanian(b.gl), "L1"), kp2 = jml((b) => pertanian(b.gl), "L2");
 
+    // Matriks transisi (opsional, tab lahan_transisi)
+    const tr = (data.lahan_transisi || []).map((r) => ({ kel: String(r.kelurahan || "").trim(), dari: String(r.dari || "").trim(),
+      ke: String(r.menjadi || "").trim(), L: K.angka(r.luas_ha) })).filter((r) => r.dari && r.ke && K.ada(r.L));
+    const sumTr = (f) => tr.filter(f).reduce((a, r) => a + r.L, 0);
+    const terbangun = (g) => /permukiman/i.test(g);
+    const afBruto = sumTr((r) => pertanian(r.dari) && !pertanian(r.ke)), tbBaru = sumTr((r) => terbangun(r.ke) && !terbangun(r.dari));
+
     el.innerHTML = `
       <div class="card blok"><h2>Perubahan guna lahan Kecamatan Ampenan (${esc(lbl1)}–${esc(lbl2)})</h2>
+        ${meta.sumber ? `<p class="small muted">Sumber: ${esc(meta.sumber)}</p>` : ""}
         <div class="hasil-ringkas">
           <div><span class="small muted">Luas terdata ${esc(lbl1)} / ${esc(lbl2)}</span><b>${K.fmt(T1, 1)} / ${K.fmt(T2, 1)} ha</b></div>
-          <div><span class="small muted">Lahan pertanian (sawah/KP2B) beralih fungsi</span><b>${K.fmt(kp1 - kp2, 2)} ha</b></div>
+          <div><span class="small muted">Lahan pertanian (sawah/KP2B) berkurang bersih</span><b>${K.fmt(kp1 - kp2, 2)} ha</b></div>
           <div><span class="small muted">Laju alih fungsi pertanian</span><b>${K.ada(dt) && kp1 > 0 ? K.fmt(((kp1 - kp2) / kp1 / dt) * 100, 2) + "%/tahun" : "–"}</b></div>
+          ${tr.length ? `<div><span class="small muted">Sawah/KP2B beralih fungsi (bruto)</span><b>${K.fmt(afBruto, 2)} ha</b></div>
+          <div><span class="small muted">Lahan terbangun baru</span><b>${K.fmt(tbBaru, 2)} ha</b></div>` : ""}
         </div>
         ${K.ada(dt) ? "" : '<p class="small"><span class="pill warn">Tahun belum diisi</span> Laju per tahun baru dihitung setelah tahun_awal dan tahun_akhir diisi di tab lahan_meta.</p>'}
+        ${meta.catatan ? `<p class="small muted">${esc(meta.catatan)}</p>` : ""}
         <div id="t-rekap"></div>
       </div>
       <div class="card blok"><h2>Alih fungsi lahan pertanian per kelurahan</h2><div id="t-kp2b"></div></div>
+      ${tr.length ? `<div class="card blok"><h2>Alih fungsi sawah/KP2B menurut penggunaan baru</h2><div id="t-af"></div>
+        <div class="grafik" style="height:${Math.max(280, kels.length * 30 + 90)}px"><canvas id="g-af"></canvas></div></div>
+      <div class="card blok"><h2>Matriks transisi ${esc(lbl1)} → ${esc(lbl2)} (ha)</h2><div id="t-transisi"></div></div>
+      <div class="card blok"><h2>Asal lahan terbangun baru</h2><div id="t-asal"></div></div>` : ""}
       <div class="card blok"><h2>Perubahan luas per kelurahan dan guna lahan (ha)</h2><div id="t-matriks"></div></div>
       <div class="card blok"><h2>Komposisi guna lahan ${esc(lbl2)}</h2><div id="t-komp"></div>
         <div class="grafik" style="height:${Math.max(320, kels.length * 34 + 90)}px"><canvas id="g-komp"></canvas></div></div>`;
@@ -89,13 +111,64 @@ K.halaman({
     });
     barisKp.sort((x, y) => (y[3] || 0) - (x[3] || 0));
     K.tabelHasil(document.getElementById("t-kp2b"), {
-      kolom: ["Kelurahan", `Sawah/KP2B ${lbl1} (ha)`, `Sawah/KP2B ${lbl2} (ha)`, "Beralih fungsi (ha)", "Laju alih fungsi (%/tahun)", "Pertambahan permukiman (ha)"],
+      kolom: ["Kelurahan", `Sawah/KP2B ${lbl1} (ha)`, `Sawah/KP2B ${lbl2} (ha)`, "Berkurang bersih (ha)", "Laju alih fungsi (%/tahun)", "Pertambahan permukiman (ha)"],
       baris: barisKp,
       desimal: [0, 2, 2, 2, 2, 2],
       kelas: (v, i, j) => (j === 3 && K.ada(v) && v > 0 ? "bad" : ""),
       namaFile: "alih-fungsi-kp2b",
-      catatan: "Diurutkan dari alih fungsi terbesar. Laju positif = lahan pertanian berkurang.",
+      catatan: "Diurutkan dari pengurangan terbesar. Laju positif = lahan pertanian berkurang.",
     });
+
+    if (tr.length) {
+      const kelasTr = (() => { const s = [...new Set(tr.flatMap((r) => [r.dari, r.ke]))]; return [...kelas.filter((g) => s.includes(g)), ...s.filter((g) => !kelas.includes(g))]; })();
+      const kelTr = K.urutKel([...new Set(tr.map((r) => r.kel))].map((k) => ({ kelurahan: k }))).map((r) => r.kelurahan);
+      const jumlahKolom = (rows, n) => Array.from({ length: n }, (_, i) => rows.reduce((a, r) => a + r[i + 1], 0));
+
+      // Alih fungsi sawah/KP2B menurut penggunaan baru
+      const tujuan = kelasTr.filter((g) => !pertanian(g) && tr.some((r) => pertanian(r.dari) && r.ke === g));
+      const barisAf = kelTr.map((k) => {
+        const d = tujuan.map((g) => sumTr((r) => r.kel === k && pertanian(r.dari) && r.ke === g));
+        const bruto = d.reduce((a, v) => a + v, 0), baru = sumTr((r) => r.kel === k && !pertanian(r.dari) && pertanian(r.ke));
+        return [k, ...d, bruto, baru, baru - bruto];
+      }).filter((r) => r.slice(1).some((v) => Math.abs(v) > 1e-9)).sort((x, y) => y[tujuan.length + 1] - x[tujuan.length + 1]);
+      K.tabelHasil(document.getElementById("t-af"), {
+        kolom: ["Kelurahan", ...tujuan.map((g) => `Menjadi ${g.toLowerCase()} (ha)`), "Alih fungsi bruto (ha)", "Sawah/KP2B baru (ha)", "Perubahan bersih (ha)"],
+        baris: [...barisAf, ["Jumlah", ...jumlahKolom(barisAf, tujuan.length + 3)]],
+        desimal: [0, ...tujuan.map(() => 2), 2, 2, 2],
+        kelas: (v, i, j) => (j === tujuan.length + 1 && v > 0 ? "bad" : ""),
+        namaFile: "alih-fungsi-sawah-transisi",
+        catatan: "Dari tab lahan_transisi. Bruto = sawah/KP2B tahun awal yang menjadi kelas lain; bersih = sawah/KP2B baru − bruto.",
+      });
+      K.grafik("g-af", {
+        type: "bar",
+        data: { labels: barisAf.map((r) => r[0]), datasets: tujuan.map((g, i) => ({ label: g, data: barisAf.map((r) => r[i + 1]), backgroundColor: warnaGuna(g, kelas.includes(g) ? kelas.indexOf(g) : i + 5) })) },
+        options: { indexAxis: "y", scales: { x: { stacked: true, title: { display: true, text: "ha" } }, y: { stacked: true } },
+          plugins: { legend: { position: "bottom" }, title: { display: true, text: `Sawah/KP2B ${lbl1} yang beralih fungsi sampai ${lbl2}` } } },
+      });
+
+      // Matriks transisi kecamatan
+      const mat = kelasTr.map((a) => { const r = [a, ...kelasTr.map((b) => sumTr((x) => x.dari === a && x.ke === b))]; r.push(r.slice(1).reduce((s, v) => s + v, 0)); return r; });
+      K.tabelHasil(document.getElementById("t-transisi"), {
+        kolom: [`${lbl1} ↓ / ${lbl2} →`, ...kelasTr, `Jumlah ${lbl1}`],
+        baris: [...mat, [`Jumlah ${lbl2}`, ...jumlahKolom(mat, kelasTr.length + 1)]],
+        desimal: [0, ...kelasTr.map(() => 2), 2],
+        kelas: (v, i, j) => (i < kelasTr.length && j > 0 && j <= kelasTr.length && i !== j - 1 && v > 0.005 ? "warn" : ""),
+        namaFile: "matriks-transisi-lahan",
+        catatan: "Baris = kelas tahun awal, kolom = kelas tahun akhir. Diagonal = tidak berubah; angka berwarna = berpindah kelas.",
+      });
+
+      // Asal lahan terbangun baru per kelurahan
+      const asal = kelasTr.filter((g) => !terbangun(g) && tr.some((r) => r.dari === g && terbangun(r.ke)));
+      const barisAsal = kelTr.map((k) => { const d = asal.map((g) => sumTr((r) => r.kel === k && r.dari === g && terbangun(r.ke))); return [k, ...d, d.reduce((a, v) => a + v, 0)]; })
+        .filter((r) => r[r.length - 1] > 1e-9).sort((x, y) => y[y.length - 1] - x[x.length - 1]);
+      K.tabelHasil(document.getElementById("t-asal"), {
+        kolom: ["Kelurahan", ...asal.map((g) => `Dari ${g.toLowerCase()} (ha)`), "Jumlah (ha)"],
+        baris: [...barisAsal, ["Jumlah", ...jumlahKolom(barisAsal, asal.length + 1)]],
+        desimal: [0, ...asal.map(() => 2), 2],
+        namaFile: "asal-lahan-terbangun-baru",
+        catatan: "Kelas tahun awal dari lahan yang pada tahun akhir menjadi permukiman & lahan terbangun.",
+      });
+    }
 
     K.tabelHasil(document.getElementById("t-matriks"), {
       kolom: ["Kelurahan", ...kelas, "Jumlah"],
@@ -115,7 +188,7 @@ K.halaman({
     });
     K.grafik("g-komp", {
       type: "bar",
-      data: { labels: kels, datasets: kelas.map((g, i) => ({ label: g, data: komp.map((r) => r[i + 1]), backgroundColor: K.WARNA[i % 10] })) },
+      data: { labels: kels, datasets: kelas.map((g, i) => ({ label: g, data: komp.map((r) => r[i + 1]), backgroundColor: warnaGuna(g, i) })) },
       options: { indexAxis: "y", scales: { x: { stacked: true, max: 100, title: { display: true, text: "% luas kelurahan" } }, y: { stacked: true } },
         plugins: { legend: { position: "bottom" }, title: { display: true, text: `Komposisi guna lahan ${lbl2} per kelurahan` } } },
     });
