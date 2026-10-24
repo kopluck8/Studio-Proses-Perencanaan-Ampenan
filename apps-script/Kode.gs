@@ -580,6 +580,8 @@ function sesuaikanPerubahanLahan() {
   };
   isiKosong('lahan_meta', ['kunci'], ['nilai'], true);
   isiKosong('mismatch', ['kelurahan', 'jenis'], ['luas_ha', 'luas_zona_ha'], false, (r, k) => r[k.indexOf('jenis')] === 'Mismatch: KP2B');
+  // Perkiraan lahan permukiman 2025: lahan terbangun di luar zona RDTR bukan hunian.
+  isiKosong('kelurahan', ['kelurahan'], ['lahan_permukiman_ha'], false);
 
   // Kebutuhan data FL-07, FL-08, EK-05: kondisi diperbarui hanya bila masih "Belum ada".
   const kd = ss.getSheetByName('kebutuhan_data'), data = repo('kebutuhan_data');
