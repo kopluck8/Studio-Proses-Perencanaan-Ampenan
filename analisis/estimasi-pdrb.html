@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="id" data-root="..">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estimasi PDRB Kecamatan · Studio Ampenan</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="analisis/index.html">
+<main>
+  <div class="page-head">
+    <p class="small"><a href="index.html">← Semua kalkulator</a></p>
+    <h1>Estimasi PDRB Kecamatan</h1>
+    <p class="muted">Aspek Ekonomi · PJ Bidang Ekonomi &amp; Permukiman. PDRB hanya tersedia untuk Kota Mataram, jadi PDRB Kecamatan Ampenan per sektor diestimasi dari PDRB kota. Isi PDRB kota per sektor di kolom <code>pembanding_awal</code> dan <code>pembanding_akhir</code> tab <code>ekonomi_sektor</code>, penduduk keenam kecamatan di tab <code>pdrb_kecamatan</code>, dan pekerja per sektor per kecamatan di tab <code>pekerja_sektor</code>. Hasil untuk Ampenan otomatis dipakai kalkulator <a href="lq.html">LQ</a> dan <a href="shift-share.html">Shift Share</a> selama kolom wilayah di <code>ekonomi_sektor</code> dibiarkan kosong.</p>
+  </div>
+  <div id="kalkulator"></div>
+  <details class="card blok rumus">
+    <summary><b>Rumus dan sumber</b></summary>
+    <p>Metode: Fajar, M. <i>Estimasi PDRB Nominal Tingkat Kecamatan di Kabupaten Waropen</i> (estimasi wilayah kecil, BPS 2010). Dihitung terpisah untuk tahun awal dan tahun akhir.</p>
+    <ol>
+      <li><b>Pendekatan konsumsi rumah tangga.</b> <code>share konsumsiₖ = Pₖ·cₖ / Σ(P·c)</code>, P = penduduk, c = konsumsi per kapita. Bila hanya ada angka kota (Susenas), c sama untuk semua kecamatan sehingga share konsumsi = share penduduk. <code>PDRBₖ⁽¹⁾ = share konsumsiₖ × PDRB kota</code>.</li>
+      <li><b>Pendekatan penduduk bekerja.</b> <code>PDRBₖ⁽²⁾ = (Lₖ / ΣL) × PDRB kota</code>, L = penduduk bekerja (kolom <code>pekerja_total</code>, atau jumlah tab <code>pekerja_sektor</code> bila kosong).</li>
+      <li><b>Kompromi.</b> <code>PDRBₖ = w·PDRBₖ⁽¹⁾ + (1 − w)·PDRBₖ⁽²⁾</code>, w = <code>bobot_konsumsi_pdrb</code> (jurnal: 50%).</li>
+      <li><b>Per sektor (IPF).</b> Matriks sektor × kecamatan diawali sebaran pekerja per sektor, lalu disesuaikan berulang sampai jumlah tiap baris = PDRB kota sektor itu dan jumlah tiap kolom = PDRBₖ: <code>p⁽ᵏ⁺¹⁾ᵢₖ = p⁽ᵏ⁾ᵢₖ / Σₖ p⁽ᵏ⁾ᵢₖ × PDRBᵢ</code>, lalu <code>p⁽ᵏ⁺²⁾ᵢₖ = p⁽ᵏ⁺¹⁾ᵢₖ / Σᵢ p⁽ᵏ⁺¹⁾ᵢₖ × PDRBₖ</code>.</li>
+    </ol>
+    <p>Kolom <code>kategori_pdrb</code> di tab <code>pekerja_sektor</code> menghubungkan kelompok pekerja dengan kategori PDRB (huruf A–U). Kelompok boleh dipecah lebih rinci bila sumber datanya rinci.</p>
+    <p><b>Keterbatasan.</b> Sektor yang tidak punya pekerja di suatu kecamatan menghasilkan PDRB 0 di kecamatan itu. Karena PDRB dibagi menurut jumlah pekerja, LQ dari hasil estimasi akan mirip LQ tenaga kerja. Hasil adalah petunjuk awal aktivitas ekonomi wilayah kecil dan perlu disebut sebagai estimasi di laporan.</p>
+  </details>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/kalkulator.js"></script>
+<script>
+const esc = Studio.esc;
+const singkat = (s) => (s.length > 34 ? s.slice(0, 33) + "…" : s);
+
+K.halaman({
+  tabs: [
+    { nama: "pdrb_kecamatan", judul: "Penduduk, konsumsi, dan pekerja per kecamatan", kunci: ["kecamatan"] },
+    { nama: "pekerja_sektor", judul: "Pekerja per sektor per kecamatan", kunci: ["kelompok", "kategori_pdrb", "periode"], teks: ["kelompok", "kategori_pdrb", "periode"], tambahBaris: true, tertutup: true },
+    { nama: "ekonomi_sektor", judul: "PDRB Kota Mataram per sektor (kolom pembanding)", kunci: ["sektor"], tertutup: true },
+    { nama: "ekonomi_meta", judul: "Keterangan variabel, tahun, konsumsi kota", kunci: ["kunci"], teks: ["nilai"] },
+  ],
+  param: ["bobot_konsumsi_pdrb"],
+  hitung({ data, p, el }) {
+    const meta = Object.fromEntries(data.ekonomi_meta.map((r) => [r.kunci, String(r.nilai ?? "").trim()]));
+    const hasil = { awal: K.estimasiPdrb(data, p, "awal"), akhir: K.estimasiPdrb(data, p, "akhir") };
+    const per = ["awal", "akhir"].filter((x) => hasil[x]);
+    if (!per.length) {
+      el.innerHTML = K.pesanKosong("Isi PDRB Kota Mataram per sektor (kolom pembanding_awal/akhir di ekonomi_sektor), penduduk semua kecamatan di pdrb_kecamatan, dan pekerja per sektor di pekerja_sektor.");
+      return;
+    }
+    const tahun = (x) => meta[`tahun_${x}`] || x;
+    const utama = hasil.akhir || hasil.awal;
+    const iw = utama.wilayah;
+    const namaW = iw >= 0 ? utama.kec[iw].nama : "–";
+    const pdrbW = (h) => (h && h.wilayah >= 0 ? h.pdrbKec[h.wilayah] : NaN);
+    const tumbuh = hasil.awal && hasil.akhir ? (pdrbW(hasil.akhir) / pdrbW(hasil.awal) - 1) * 100 : NaN;
+    const catatan = [...new Set(per.flatMap((x) => hasil[x].catatan.map((c) => `${tahun(x)}: ${c}`)))];
+
+    el.innerHTML = `
+      <div class="card blok"><h2>Hasil estimasi ${esc(namaW)}</h2>
+        <div class="hasil-ringkas">
+          ${per.map((x) => `<div><span class="small muted">PDRB ${esc(namaW)} ${esc(tahun(x))}</span><b>${K.fmt(pdrbW(hasil[x]), 2)}</b></div>
+          <div><span class="small muted">Porsi dari kota ${esc(tahun(x))}</span><b>${K.fmt(pdrbW(hasil[x]) / hasil[x].totalKota * 100, 2)}%</b></div>`).join("")}
+          ${K.ada(tumbuh) ? `<div><span class="small muted">Pertumbuhan ${esc(tahun("awal"))}–${esc(tahun("akhir"))}</span><b>${K.fmt(tumbuh, 2)}%</b></div>` : ""}
+        </div>
+        <p class="small muted">Satuan ${esc(meta.satuan || "-")}. Bobot konsumsi ${K.fmt(utama.bobot * 100, 0)}%, pekerja ${K.fmt((1 - utama.bobot) * 100, 0)}%.</p>
+        ${catatan.length ? `<div class="notice small">${catatan.map(esc).join("<br>")}</div>` : ""}
+        <h3>PDRB ${esc(namaW)} per sektor</h3>
+        <div id="t-sektor"></div>
+        <div class="grafik" style="height:${Math.max(320, utama.sektor.length * 26 + 60)}px"><canvas id="g-sektor"></canvas></div>
+      </div>
+      ${per.map((x) => `<div class="card blok"><h2>PDRB per kecamatan ${esc(tahun(x))}</h2><div id="t-kec-${x}"></div>
+        <details><summary class="small"><b>Matriks IPF sektor × kecamatan ${esc(tahun(x))}</b> <span class="muted">(${hasil[x].iterasi} iterasi)</span></summary><div id="t-ipf-${x}"></div></details></div>`).join("")}`;
+
+    // Tabel per sektor untuk wilayah studi
+    const semuaSektor = data.ekonomi_sektor.map((r) => r.sektor);
+    const nilai = (h, s) => (h ? h.wilayahPerSektor[s] : NaN);
+    const kota = (h, s) => { const x = h && h.sektor.find((y) => y.sektor === s); return x ? x.pdrb : NaN; };
+    const kolomS = ["Sektor"];
+    per.forEach((x) => kolomS.push(`${namaW} ${tahun(x)}`, `Porsi kota ${tahun(x)} (%)`));
+    if (per.length === 2) kolomS.push("Pertumbuhan (%)");
+    const barisS = semuaSektor.map((s) => {
+      const r = [s];
+      per.forEach((x) => r.push(nilai(hasil[x], s), nilai(hasil[x], s) / kota(hasil[x], s) * 100));
+      if (per.length === 2) r.push((nilai(hasil.akhir, s) / nilai(hasil.awal, s) - 1) * 100);
+      return r;
+    });
+    const jumlahW = ["Jumlah"];
+    per.forEach((x) => jumlahW.push(pdrbW(hasil[x]), pdrbW(hasil[x]) / hasil[x].totalKota * 100));
+    if (per.length === 2) jumlahW.push(tumbuh);
+    barisS.push(jumlahW);
+    K.tabelHasil(document.getElementById("t-sektor"), {
+      kolom: kolomS, baris: barisS, desimal: [0, 2, 2, 2, 2, 2],
+      namaFile: "estimasi-pdrb-ampenan-per-sektor",
+      catatan: "Nilai ini mengisi kolom wilayah pada LQ dan Shift Share bila kolom wilayah di ekonomi_sektor kosong.",
+    });
+    const urut = utama.sektor.map((s, i) => ({ s: s.sektor, v: iw >= 0 ? utama.matriks[i][iw] : 0 })).sort((a, b) => b.v - a.v);
+    K.grafik("g-sektor", {
+      type: "bar",
+      data: { labels: urut.map((b) => singkat(b.s)), datasets: [{ label: `${namaW} ${tahun(utama.periode)}`, data: urut.map((b) => b.v), backgroundColor: "#1f6f5c" }] },
+      options: { indexAxis: "y", plugins: { legend: { display: false }, title: { display: true, text: `PDRB ${namaW} ${tahun(utama.periode)} per sektor (${meta.satuan || ""})` } }, scales: { x: { beginAtZero: true } } },
+    });
+
+    per.forEach((x) => {
+      const h = hasil[x];
+      K.tabelHasil(document.getElementById(`t-kec-${x}`), {
+        kolom: ["Kecamatan", "Penduduk", "Share konsumsi (%)", "Pekerja", "Share pekerja (%)", "PDRB konsumsi", "PDRB pekerja", "PDRB rata-rata", "Beda thd rata-rata (%)"],
+        baris: h.kec.map((k, j) => [k.nama, k.penduduk, h.shareKonsumsi[j] * 100, h.jmlPekerja[j], h.sharePekerja[j] * 100,
+          h.pdrbKonsumsi[j], h.pdrbPekerja[j], h.pdrbKec[j], Math.abs(h.pdrbKonsumsi[j] - h.pdrbPekerja[j]) / h.pdrbKec[j] * 100])
+          .concat([["Jumlah", h.kec.reduce((a, k) => a + k.penduduk, 0), 100, h.jmlPekerja.reduce((a, b) => a + b, 0), 100, h.totalKota, h.totalKota, h.totalKota, ""]]),
+        desimal: [0, 0, 2, 0, 2, 2, 2, 2, 2],
+        kelas: (v, i, j) => (j === 0 && i === h.wilayah ? "ok" : ""),
+        namaFile: `estimasi-pdrb-kecamatan-${x}`,
+        catatan: `Pekerja dari ${h.pakaiTotal ? "kolom pekerja_total" : "jumlah tab pekerja_sektor"}. Beda besar (&gt; 30%) berarti kedua pendekatan tidak sepakat untuk kecamatan itu.`,
+      });
+      K.tabelHasil(document.getElementById(`t-ipf-${x}`), {
+        kolom: ["Sektor", ...h.kec.map((k) => k.nama), "PDRB kota"],
+        baris: h.sektor.map((s, i) => [s.sektor, ...h.matriks[i], s.pdrb])
+          .concat([["PDRB kecamatan", ...h.pdrbKec, h.totalKota]]),
+        desimal: Array(h.kec.length + 2).fill(2),
+        namaFile: `matriks-ipf-${x}`,
+      });
+    });
+  },
+});
+</script>
+</body>
+</html>

@@ -1,7 +1,10 @@
 kunci,nilai
-variabel,PDRB / tenaga kerja / unit usaha (pilih satu)
+variabel,PDRB ADHK 2010 menurut lapangan usaha (Ampenan = hasil Estimasi PDRB Kecamatan)
 satuan,juta rupiah
-tahun_awal,
-tahun_akhir,
+tahun_awal,2020
+tahun_akhir,2023
 wilayah,Kecamatan Ampenan
 pembanding,Kota Mataram
+konsumsi_kapita_kota_awal,
+konsumsi_kapita_kota_akhir,
+sumber_penduduk_kecamatan,"Awal: SP2020 (BPS). Akhir: proyeksi BPS pertengahan 2023 (Kota Mataram Dalam Angka 2024). Satu sumber untuk semua kecamatan agar share sebanding; angka Dukcapil di penduduk_seri berbeda."

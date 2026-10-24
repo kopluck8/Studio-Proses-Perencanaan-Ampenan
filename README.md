@@ -9,7 +9,7 @@ Halaman:
 | Beranda (`index.html`) | Ringkasan sesi, tugas, data, foto survei | semua tab |
 | Jadwal (`jadwal.html`) | 12 sesi dan milestone | tab `jadwal` |
 | Tugas (`tugas.html`) | Tugas per bidang dan PJ | tab `tugas` |
-| Kebutuhan Data (`kebutuhan-data.html`) | Daftar 49 data, kondisi, verifikasi admin | tab `kebutuhan_data` |
+| Kebutuhan Data (`kebutuhan-data.html`) | Daftar 52 data, kondisi, verifikasi admin | tab `kebutuhan_data` |
 | Peta Survei (`peta-survei.html`) | Titik foto survei lapangan dengan popup foto | `data/survei/survei_foto.csv` + tab `survei_foto` |
 | Analisis (`analisis/`) | Kalkulator analisis 6 aspek dan tahap 2–4 | tab input per kalkulator |
 
@@ -43,6 +43,8 @@ Semua data progres dan input kalkulator diisi tim di satu Google Sheets. Tidak p
 
 Setelah itu dashboard membaca Sheets langsung setiap kali halaman dibuka; perubahan di Sheets langsung terlihat setelah halaman dimuat ulang. Bagian bawah setiap halaman menulis sumber datanya ("Google Sheets (langsung)" atau "salinan repo"). Bila satu tab tidak ditemukan, dashboard memakai salinan di `data/sheets/`.
 
+Menu **Sesuaikan: Estimasi PDRB kecamatan** (sekali, setelah `Kode.gs` diperbarui) membuat tab `pdrb_kecamatan` dan `pekerja_sektor`, menambah baris baru di `ekonomi_meta` dan `parameter`, serta memperbarui kebutuhan data ekonomi tanpa menimpa isian.
+
 Menu **Isi ulang satu tab dari repo** menimpa satu tab dengan isi awal dari repo, berguna bila sebuah tab rusak atau ada kolom baru.
 
 ### Isian yang diterima
@@ -71,7 +73,8 @@ Semua tab di bawah dibuat otomatis oleh Apps Script (langkah 2). Daftar tab dan 
 | `penduduk_struktur` | Sosbud & Kependudukan | struktur penduduk (tingkat kecamatan) |
 | `standar_sarana`, `sarana_eksisting` | Sarana & Prasarana | sarana, sentralitas |
 | `rth` | Sarana & Prasarana | RTH 20% |
-| `ekonomi_sektor`, `ekonomi_meta` | Ekonomi & Permukiman | LQ, shift share |
+| `ekonomi_sektor`, `ekonomi_meta` | Ekonomi & Permukiman | estimasi PDRB kecamatan (kolom pembanding = PDRB Kota Mataram), LQ, shift share |
+| `pdrb_kecamatan`, `pekerja_sektor` | Ekonomi & Permukiman | estimasi PDRB kecamatan; hasilnya mengisi kolom wilayah LQ dan shift share bila kolom itu kosong |
 | `lahan`, `lahan_meta` | Fisik & Lingkungan | perubahan lahan |
 | `skl` | Fisik & Lingkungan | SKL |
 | `bencana` | Kebencanaan | keterpaparan bencana |
@@ -106,7 +109,7 @@ Foto asli resolusi penuh tetap disimpan di Google Drive; repo hanya menyimpan ve
 
 ```
 index.html, jadwal.html, tugas.html, kebutuhan-data.html, peta-survei.html
-analisis/                 21 halaman kalkulator
+analisis/                 22 halaman kalkulator
 assets/css, assets/js     tampilan dan skrip bersama
 data/config.json          URL Google Sheets, tanggal presentasi, kategori survei
 data/sheets/              salinan awal tiap tab Sheets (cadangan)

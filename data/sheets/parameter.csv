@@ -46,3 +46,4 @@ rth_publik_target,20,% luas wilayah,UU 26/2007
 rth_privat_target,10,% luas wilayah,UU 26/2007
 dddtl_alfa,26,m²/kapita,Kebutuhan lahan permukiman per kapita
 ahp_cr_maks,0.1,-,Batas rasio konsistensi
+bobot_konsumsi_pdrb,50,%,"Estimasi PDRB kecamatan: bobot pendekatan konsumsi rumah tangga; sisanya pendekatan penduduk bekerja (jurnal: 50)"

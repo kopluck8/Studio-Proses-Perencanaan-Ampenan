@@ -11,7 +11,7 @@
   <div class="page-head">
     <p class="small"><a href="index.html">← Semua kalkulator</a></p>
     <h1>Location Quotient (LQ)</h1>
-    <p class="muted">Aspek Ekonomi · PJ Bidang Ekonomi &amp; Permukiman. Isi nilai per sektor (PDRB, tenaga kerja, atau jumlah unit usaha) untuk wilayah studi dan wilayah pembanding di tab <code>ekonomi_sektor</code>. Keterangan variabel dan tahun diisi di tab <code>ekonomi_meta</code>. Tab yang sama dipakai kalkulator Shift Share.</p>
+    <p class="muted">Aspek Ekonomi · PJ Bidang Ekonomi &amp; Permukiman. Isi nilai per sektor (PDRB, tenaga kerja, atau jumlah unit usaha) untuk wilayah studi dan wilayah pembanding di tab <code>ekonomi_sektor</code>. Bila kolom wilayah dibiarkan kosong, nilai Ampenan diambil dari kalkulator <a href="estimasi-pdrb.html">Estimasi PDRB Kecamatan</a>. Keterangan variabel dan tahun diisi di tab <code>ekonomi_meta</code>. Tab yang sama dipakai kalkulator Shift Share.</p>
   </div>
   <div id="kalkulator"></div>
   <details class="card blok rumus">
@@ -44,10 +44,17 @@ K.halaman({
     { nama: "ekonomi_sektor", judul: "Nilai per sektor", kunci: ["sektor"] },
     { nama: "ekonomi_meta", judul: "Keterangan variabel dan tahun", kunci: ["kunci"], teks: ["nilai"] },
   ],
-  hitung({ data, el }) {
+  bacaan: ["pdrb_kecamatan", "pekerja_sektor"],
+  hitung({ data, p, el }) {
     const meta = Object.fromEntries(data.ekonomi_meta.map((r) => [r.kunci, String(r.nilai ?? "").trim()]));
+    // Kolom wilayah kosong: pakai hasil kalkulator Estimasi PDRB Kecamatan.
+    const est = K.wilayahDariEstimasi(data, p);
+    const dariEst = (h, s) => (h ? h.wilayahPerSektor[s] ?? NaN : NaN);
+    const infoEst = est ? `<div class="notice small">Kolom wilayah di <code>ekonomi_sektor</code> kosong, jadi nilai ${Studio.esc(meta.wilayah || "wilayah studi")} diambil dari <a href="estimasi-pdrb.html">Estimasi PDRB Kecamatan</a>${est.awal ? "" : " (periode akhir saja)"}. Isi kolom wilayah bila ingin memakai data sendiri.</div>` : "";
     const baris = data.ekonomi_sektor.map((r) => ({
-      sektor: r.sektor, sa: K.angka(r.wilayah_awal), sk: K.angka(r.wilayah_akhir),
+      sektor: r.sektor,
+      sa: est ? dariEst(est.awal, r.sektor) : K.angka(r.wilayah_awal),
+      sk: est ? dariEst(est.akhir, r.sektor) : K.angka(r.wilayah_akhir),
       na: K.angka(r.pembanding_awal), nk: K.angka(r.pembanding_akhir),
     }));
     const jumlah = (k) => baris.reduce((a, b) => a + (K.ada(b[k]) ? b[k] : 0), 0);
@@ -57,7 +64,7 @@ K.halaman({
     };
     const lqAkhir = hitungLQ("sk", "nk");
     if (!lqAkhir.some(K.ada)) {
-      el.innerHTML = K.pesanKosong("Isi kolom wilayah_akhir dan pembanding_akhir untuk sektor-sektor di tab ekonomi_sektor.");
+      el.innerHTML = K.pesanKosong("Isi kolom wilayah_akhir dan pembanding_akhir untuk sektor-sektor di tab ekonomi_sektor, atau lengkapi data kalkulator <a href=\"estimasi-pdrb.html\">Estimasi PDRB Kecamatan</a> agar kolom wilayah terisi otomatis.");
       return;
     }
     const lqAwal = hitungLQ("sa", "na");
@@ -68,7 +75,7 @@ K.halaman({
     const urut = baris.map((b, i) => ({ ...b, lq: lqAkhir[i], lq0: lqAwal[i] })).filter((b) => K.ada(b.lq)).sort((a, b) => b.lq - a.lq);
 
     el.innerHTML = `
-      <div class="card blok"><h2>Hasil LQ</h2>
+      ${infoEst}<div class="card blok"><h2>Hasil LQ</h2>
         <div class="hasil-ringkas">
           <div><span class="small muted">Variabel</span><b>${Studio.esc(meta.variabel || "–")}</b></div>
           <div><span class="small muted">Wilayah / pembanding</span><b>${Studio.esc(meta.wilayah || "–")} / ${Studio.esc(meta.pembanding || "–")}</b></div>

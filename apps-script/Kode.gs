@@ -20,7 +20,7 @@ const TAB = [
   'jadwal', 'tugas', 'kebutuhan_data', 'survei_foto',
   'kelurahan', 'parameter', 'penduduk_seri', 'penduduk_struktur',
   'standar_sarana', 'sarana_eksisting', 'rth',
-  'ekonomi_sektor', 'ekonomi_meta', 'lahan', 'lahan_meta', 'skl',
+  'ekonomi_sektor', 'ekonomi_meta', 'pdrb_kecamatan', 'pekerja_sektor', 'lahan', 'lahan_meta', 'skl',
   'bencana', 'cagar_budaya', 'stakeholder', 'anggaran',
   'ahp_responden', 'wlc_layer', 'zonasi_wlc', 'mismatch', 'swot',
 ];
@@ -54,6 +54,7 @@ function onOpen() {
     .addItem('Tampilkan ID untuk config.json', 'tampilkanId')
     .addItem('Isi ulang satu tab dari repo (menimpa)', 'isiUlangSatuTab')
     .addItem('Sesuaikan: Lingkungan & struktur penduduk kecamatan', 'sesuaikanLingkunganDanStruktur')
+    .addItem('Sesuaikan: Estimasi PDRB kecamatan', 'sesuaikanEstimasiPdrb')
     .addToUi();
 }
 
@@ -199,6 +200,8 @@ const BOLEH = {
   rth: { kolom: '*', kunci: ['kelurahan'] },
   ekonomi_sektor: { kolom: '*', kunci: ['sektor'] },
   ekonomi_meta: { kolom: '*', kunci: ['kunci'] },
+  pdrb_kecamatan: { kolom: '*', kunci: ['kecamatan'] },
+  pekerja_sektor: { kolom: '*', kunci: ['kelompok', 'kategori_pdrb', 'periode'], tambah: true },
   lahan: { kolom: '*', kunci: ['kelurahan'], tambah: true },
   lahan_meta: { kolom: '*', kunci: ['kunci'] },
   skl: { kolom: '*', tambah: true },
@@ -408,6 +411,81 @@ function sesuaikanLingkunganDanStruktur() {
     const cId = kepala.indexOf('id') + 1, cR = kepala.indexOf('rincian_variabel') + 1;
     const ids = kd.getRange(2, cId, kd.getLastRow() - 1, 1).getValues();
     ids.forEach((x, i) => { if (x[0] === 'DM-02') kd.getRange(i + 2, cR).setValue('Kelompok umur 5 tahunan tingkat kecamatan (tidak tersedia per kelurahan)'); });
+  }
+
+  SpreadsheetApp.getUi().alert('Penyesuaian selesai.\n\n' + (catatan.join('\n') || 'Tidak ada yang perlu diubah.'));
+}
+
+
+// ===================== Penyesuaian 24 Okt 2026 (2) =====================
+// Kalkulator Estimasi PDRB Kecamatan: dua tab baru, baris baru di ekonomi_meta dan parameter,
+// serta kebutuhan data ekonomi yang diperbarui. Isian yang sudah ada tidak ditimpa.
+function sesuaikanEstimasiPdrb() {
+  const ss = SpreadsheetApp.getActive();
+  const catatan = [];
+
+  ['pdrb_kecamatan', 'pekerja_sektor'].forEach((nama) => {
+    let sh = ss.getSheetByName(nama);
+    if (sh && sh.getLastRow() > 1) { catatan.push(nama + ': sudah ada, dilewati'); return; }
+    if (!sh) sh = ss.insertSheet(nama, TAB.indexOf(nama));
+    isiDariRepo_(sh, nama);
+    catatan.push(nama + ': tab dibuat');
+  });
+
+  // Tambah baris yang belum ada (kunci di kolom pertama) dari salinan repo.
+  const tambahBaris = (nama, isiKosongJuga) => {
+    const sh = ss.getSheetByName(nama);
+    if (!sh) return;
+    const res = UrlFetchApp.fetch(REPO_RAW + nama + '.csv', { muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return;
+    const repo = Utilities.parseCsv(res.getContentText('UTF-8'));
+    const nilai = sh.getDataRange().getValues();
+    const kunci = nilai.map((r) => String(r[0]).trim());
+    repo.slice(1).forEach((r) => {
+      const i = kunci.indexOf(r[0]);
+      if (i < 0) {
+        sh.getRange(sh.getLastRow() + 1, 1, 1, r.length).setNumberFormat('@').setValues([r]);
+        catatan.push(nama + ': baris ' + r[0] + ' ditambahkan');
+      } else if (isiKosongJuga && isiKosongJuga.indexOf(r[0]) >= 0) {
+        // Ganti nilai bawaan lama yang masih kosong atau masih teks contoh.
+        const lama = String(nilai[i][1]).trim();
+        if (!lama || /pilih satu/i.test(lama)) { sh.getRange(i + 1, 2).setNumberFormat('@').setValue(r[1]); catatan.push(nama + ': ' + r[0] + ' diisi'); }
+      }
+    });
+  };
+  tambahBaris('ekonomi_meta', ['variabel', 'tahun_awal', 'tahun_akhir']);
+  tambahBaris('parameter');
+
+  // Kebutuhan data ekonomi: perbarui EK-01/EK-02 dan tambah EK-06..EK-08 (kolom kondisi dan ceklis tidak diubah).
+  const kd = ss.getSheetByName('kebutuhan_data');
+  const res = UrlFetchApp.fetch(REPO_RAW + 'kebutuhan_data.csv', { muteHttpExceptions: true });
+  if (kd && res.getResponseCode() === 200) {
+    const repo = Utilities.parseCsv(res.getContentText('UTF-8'));
+    const kRepo = repo[0];
+    const kepala = kd.getRange(1, 1, 1, kd.getLastColumn()).getValues()[0].map(String);
+    const ids = kd.getRange(1, 1, kd.getLastRow(), 1).getValues().map((r) => String(r[0]).trim());
+    const ubahKolom = ['data', 'rincian_variabel', 'format', 'sumber_instansi', 'metode', 'dipakai_untuk'];
+    repo.slice(1).filter((r) => /^EK-0[1-26-8]$/.test(r[0])).forEach((r) => {
+      const i = ids.indexOf(r[0]);
+      if (i < 0) {
+        const baris = kepala.map((k) => { const j = kRepo.indexOf(k); return j < 0 ? '' : r[j]; });
+        const cCek = kepala.indexOf('ceklis_deo');
+        if (cCek >= 0) baris[cCek] = false;
+        // Sisipkan setelah baris EK terakhir supaya urutannya rapi.
+        let setelah = ids.reduce((a, x, k) => (/^EK-/.test(x) ? k : a), kd.getLastRow() - 1);
+        kd.insertRowAfter(setelah + 1);
+        kd.getRange(setelah + 2, 1, 1, baris.length).setValues([baris]);
+        if (cCek >= 0) kd.getRange(setelah + 2, cCek + 1).insertCheckboxes().setValue(false);
+        ids.splice(setelah + 1, 0, r[0]);
+        catatan.push('kebutuhan_data: ' + r[0] + ' ditambahkan');
+      } else {
+        ubahKolom.forEach((k) => {
+          const c = kepala.indexOf(k), j = kRepo.indexOf(k);
+          if (c >= 0 && j >= 0) kd.getRange(i + 1, c + 1).setValue(r[j]);
+        });
+        catatan.push('kebutuhan_data: ' + r[0] + ' diperbarui');
+      }
+    });
   }
 
   SpreadsheetApp.getUi().alert('Penyesuaian selesai.\n\n' + (catatan.join('\n') || 'Tidak ada yang perlu diubah.'));

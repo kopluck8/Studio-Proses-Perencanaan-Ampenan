@@ -175,17 +175,126 @@
     return { kolomTahun, target, hasil, lajuKec };
   }
 
+  // ---- Estimasi PDRB kecamatan (Fajar, "Estimasi PDRB Nominal Tingkat Kecamatan di Kab. Waropen") ----
+  // PDRB kota dibagi ke kecamatan dengan rata-rata berbobot share konsumsi rumah tangga
+  // (penduduk × konsumsi per kapita) dan share penduduk bekerja, lalu dipecah per sektor
+  // dengan iterative proportional fitting (IPF) memakai sebaran pekerja per sektor.
+  const kodeSektor = (s) => String(s || "").split(".")[0].replace(/\s/g, "").toUpperCase().split(",").filter(Boolean);
+
+  // Mengembalikan matriks yang jumlah baris = baris[] dan jumlah kolom = kolom[].
+  function ipf(benih, baris, kolom, { maks = 1000, toleransi = 1e-8 } = {}) {
+    const m = benih.map((r) => r.slice());
+    let iterasi = 0, galat = Infinity;
+    const total = baris.reduce((a, b) => a + b, 0) || 1;
+    while (iterasi < maks && galat > toleransi) {
+      iterasi++;
+      m.forEach((r, i) => { const s = r.reduce((a, b) => a + b, 0); if (s > 0) r.forEach((v, j) => { r[j] = v / s * baris[i]; }); });
+      kolom.forEach((q, j) => { const s = m.reduce((a, r) => a + r[j], 0); if (s > 0) m.forEach((r) => { r[j] = r[j] / s * q; }); });
+      galat = Math.max(
+        ...m.map((r, i) => Math.abs(r.reduce((a, b) => a + b, 0) - baris[i])),
+        ...kolom.map((q, j) => Math.abs(m.reduce((a, r) => a + r[j], 0) - q)),
+      ) / total;
+    }
+    return { matriks: m, iterasi, galat };
+  }
+
+  // data: { ekonomi_sektor, ekonomi_meta, pdrb_kecamatan, pekerja_sektor }; p: parameter.
+  // periode: "awal" | "akhir". Hasil null bila data belum cukup.
+  function estimasiPdrb(data, p, periode) {
+    const catatan = [];
+    const meta = Object.fromEntries((data.ekonomi_meta || []).map((r) => [r.kunci, String(r.nilai ?? "").trim()]));
+    const sektor = (data.ekonomi_sektor || []).map((r) => ({ sektor: r.sektor, kode: kodeSektor(r.sektor), pdrb: angka(r[`pembanding_${periode}`]) }))
+      .filter((s) => ada(s.pdrb) && s.pdrb > 0);
+    const kec = (data.pdrb_kecamatan || []).filter((r) => String(r.kecamatan || "").trim()).map((r) => ({
+      nama: String(r.kecamatan).trim(), penduduk: angka(r[`penduduk_${periode}`]),
+      konsumsi: angka(r[`konsumsi_kapita_${periode}`]), pekerjaTotal: angka(r[`pekerja_total_${periode}`]),
+    }));
+    if (!sektor.length || !kec.length || !kec.every((k) => ada(k.penduduk) && k.penduduk > 0)) return null;
+
+    // Sebaran pekerja per sektor; periode akhir memakai periode awal bila belum diisi.
+    const barisPekerja = (per) => (data.pekerja_sektor || []).filter((r) => String(r.periode || "").trim().toLowerCase() === per
+      && kec.some((k) => ada(angka(r[k.nama]))));
+    let pekerja = barisPekerja(periode);
+    if (!pekerja.length && periode === "akhir") {
+      pekerja = barisPekerja("awal");
+      if (pekerja.length) catatan.push("Sebaran pekerja periode akhir belum diisi, jadi dipakai sebaran periode awal. Komponen pergeseran lokal Shift Share hanya mencerminkan perubahan penduduk.");
+    }
+    if (!pekerja.length) return null;
+    const kelompok = pekerja.map((r) => ({ nama: r.kelompok, kode: kodeSektor(r.kategori_pdrb), nilai: kec.map((k) => Math.max(0, angka(r[k.nama]) || 0)) }));
+
+    // Share konsumsi rumah tangga.
+    const kotaKonsumsi = angka(meta[`konsumsi_kapita_kota_${periode}`]);
+    let konsumsi = kec.map((k) => (ada(k.konsumsi) ? k.konsumsi : kotaKonsumsi));
+    if (!konsumsi.every((v) => ada(v) && v > 0)) {
+      if (kec.some((k) => ada(k.konsumsi))) catatan.push(`Konsumsi per kapita ${periode} hanya terisi untuk sebagian kecamatan dan konsumsi_kapita_kota_${periode} di ekonomi_meta kosong, jadi semua kecamatan dianggap sama (share konsumsi = share penduduk).`);
+      konsumsi = kec.map(() => 1);
+    }
+    const nilaiKonsumsi = kec.map((k, i) => k.penduduk * konsumsi[i]);
+    const totKonsumsi = nilaiKonsumsi.reduce((a, b) => a + b, 0);
+    const shareKonsumsi = nilaiKonsumsi.map((v) => v / totKonsumsi);
+
+    // Share penduduk bekerja: kolom pekerja_total bila terisi semua, selain itu jumlah sebaran per sektor.
+    const pakaiTotal = kec.every((k) => ada(k.pekerjaTotal) && k.pekerjaTotal > 0);
+    const jmlPekerja = kec.map((k, j) => (pakaiTotal ? k.pekerjaTotal : kelompok.reduce((a, g) => a + g.nilai[j], 0)));
+    const totPekerja = jmlPekerja.reduce((a, b) => a + b, 0);
+    if (!(totPekerja > 0)) return null;
+    const sharePekerja = jmlPekerja.map((v) => v / totPekerja);
+
+    const bobot = ada(angka(p.bobot_konsumsi_pdrb)) ? Math.min(100, Math.max(0, angka(p.bobot_konsumsi_pdrb))) / 100 : 0.5;
+    const totalKota = sektor.reduce((a, s) => a + s.pdrb, 0);
+    const pdrbKonsumsi = shareKonsumsi.map((s) => s * totalKota);
+    const pdrbPekerja = sharePekerja.map((s) => s * totalKota);
+    const pdrbKec = kec.map((_, j) => bobot * pdrbKonsumsi[j] + (1 - bobot) * pdrbPekerja[j]);
+
+    // Benih IPF: baris sektor PDRB memakai sebaran pekerja kelompok yang memuat kodenya.
+    const tanpaKelompok = [];
+    const benih = sektor.map((s) => {
+      const g = kelompok.filter((x) => s.kode.some((c) => x.kode.includes(c)));
+      const v = kec.map((_, j) => g.reduce((a, x) => a + x.nilai[j], 0));
+      if (v.some((x) => x > 0)) return v;
+      tanpaKelompok.push(s.sektor);
+      return pdrbKec.slice(); // tanpa data pekerja: dibagi sebanding PDRB kecamatan
+    });
+    if (tanpaKelompok.length) catatan.push(`Sektor tanpa data pekerja (dibagi sebanding PDRB kecamatan): ${tanpaKelompok.join("; ")}.`);
+    const hasilIpf = ipf(benih, sektor.map((s) => s.pdrb), pdrbKec);
+    if (hasilIpf.galat > 1e-6) catatan.push(`IPF belum konvergen penuh (selisih ${(hasilIpf.galat * 100).toFixed(4)}% setelah ${hasilIpf.iterasi} iterasi), biasanya karena banyak sel pekerja bernilai 0.`);
+
+    const target = String(meta.wilayah || "Ampenan").toLowerCase();
+    let iw = kec.findIndex((k) => target.includes(k.nama.toLowerCase()));
+    if (iw < 0) iw = kec.findIndex((k) => /ampenan/i.test(k.nama));
+    return {
+      periode, sektor, kec, bobot, totalKota, konsumsi, shareKonsumsi, jmlPekerja, sharePekerja, pakaiTotal,
+      pdrbKonsumsi, pdrbPekerja, pdrbKec, matriks: hasilIpf.matriks, iterasi: hasilIpf.iterasi, galat: hasilIpf.galat,
+      wilayah: iw, catatan,
+      // nilai wilayah studi per sektor, dipetakan ke nama sektor di ekonomi_sektor
+      wilayahPerSektor: Object.fromEntries(sektor.map((s, i) => [s.sektor, iw >= 0 ? hasilIpf.matriks[i][iw] : NaN])),
+    };
+  }
+
+  // Mengisi wilayah_awal/akhir dari estimasi bila kolom wilayah di ekonomi_sektor kosong semua.
+  function wilayahDariEstimasi(data, p) {
+    const kosong = (k) => !(data.ekonomi_sektor || []).some((r) => ada(angka(r[k])));
+    if (!kosong("wilayah_akhir") || !data.pdrb_kecamatan) return null;
+    const awal = kosong("wilayah_awal") ? estimasiPdrb(data, p, "awal") : null;
+    const akhir = estimasiPdrb(data, p, "akhir");
+    if (!akhir) return null;
+    return { awal, akhir };
+  }
+
   // ---- Kerangka halaman ----
   // cfg.tabs: [{nama, judul, kunci:[kolom readonly], teks:[kolom teks], tambahBaris}]
   // cfg.param: daftar kunci parameter yang ditampilkan; cfg.hitung(ctx)
+  // cfg.bacaan: tab tambahan yang hanya dibaca (tidak ditampilkan sebagai tabel input).
   // Tab yang hanya bisa diubah admin langsung di spreadsheet.
   const TAB_ADMIN = ["parameter", "standar_sarana"];
 
   async function halaman(cfg) {
     const tabs = cfg.tabs || [];
-    const [paramRows, ...dataTabs] = await Promise.all([tab("parameter"), ...tabs.map((t) => tab(t.nama))]);
+    const bacaan = cfg.bacaan || [];
+    const [paramRows, ...dataTabs] = await Promise.all([tab("parameter"), ...tabs.map((t) => tab(t.nama)), ...bacaan.map((n) => tab(n))]);
     const asli = { parameter: JSON.stringify(paramRows) };
     const data = {};
+    bacaan.forEach((n, i) => { data[n] = dataTabs[tabs.length + i]; });
     tabs.forEach((t, i) => { data[t.nama] = dataTabs[i]; asli[t.nama] = JSON.stringify(dataTabs[i]); });
     const paramTampil = paramRows.filter((r) => (cfg.param || []).includes(r.kunci));
 
@@ -271,5 +380,5 @@
     return `<div class="card kosong"><p><span class="pill warn">Data belum diisi</span></p><p class="muted">${teks}</p></div>`;
   }
 
-  window.K = { KELURAHAN, angka, ada, fmt, tab, petaParam, daftarTahun, tabelInput, tabelHasil, unduhCSV, grafik, WARNA, urutKel, proyeksi, METODE, halaman, statusIsi, pesanKosong };
+  window.K = { KELURAHAN, angka, ada, fmt, tab, petaParam, daftarTahun, tabelInput, tabelHasil, unduhCSV, grafik, WARNA, urutKel, proyeksi, METODE, ipf, estimasiPdrb, wilayahDariEstimasi, halaman, statusIsi, pesanKosong };
 })();
